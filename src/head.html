@@ -218,6 +218,11 @@ body:not(.showxd) .prow.xd{display:none}
 .frow b{font-size:17px}.frow .note{display:block}
 #fpref .prow{grid-template-columns:40px minmax(0,1fr)}
 [hidden]{display:none!important}
+
+.csteps li{padding:4px 0}.csteps li b{color:var(--soy);margin-right:4px}
+.csteps li.key{font-weight:500}.kb{display:inline-block;font-size:11px;background:var(--red2);color:#fff;border-radius:4px;padding:0 5px;margin-right:4px;vertical-align:2px}
+.ing p{margin:4px 0;line-height:1.8}.ing p b{color:var(--soy)}
+.ing .it{display:inline-block;white-space:nowrap;margin-right:12px}
 </style></head><body>
 <header class="top">
  <h1>锅气 · 中餐调味模拟器</h1>
@@ -338,8 +343,8 @@ body:not(.showxd) .prow.xd{display:none}
   <section class="card"><span class="seg" id="aimode" style="margin-bottom:10px"><button data-v="fridge">冰箱有什么</button><button data-v="spec">指定味型做法</button></span>
   <div id="pfridge">
    <h2>家里有什么</h2><p class="note" style="margin:0 0 6px">输入或点选现有食材，程序会把能搭的组合、各种味型和做法都试一遍，按你的口味挑出最好吃的几道。</p>
-   <div class="fl"><input id="ftext" placeholder="例如：鸡胸肉 土豆 青椒 鸡蛋 番茄" style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn" id="fparse">识别</button></div>
-   <div class="chips" id="ffcats" style="margin-top:8px"></div><div class="sgrid" id="ffgrid"></div><div id="ffsel"></div>
+   <div class="fl"><input id="ftext" placeholder="例如：茼蒿 牛肋条 鸡蛋 番茄（空格或逗号隔开）" style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn" id="fparse">识别</button></div>
+   <div id="funk"></div><div class="chips" id="ffcats" style="margin-top:8px"></div><div class="sgrid" id="ffgrid"></div><div id="ffsel"></div>
    <h3>口味</h3><div id="fpref"></div>
    <h3>时间</h3><span class="seg" id="ftime"></span>
    <h3>调料</h3><label class="unit"><input type="checkbox" id="fpo"> 只用家里有的调料（点掉没有的）</label><div class="chips2" id="fpan" style="margin-top:6px"></div>
@@ -361,7 +366,7 @@ body:not(.showxd) .prow.xd{display:none}
    <div class="fig" id="aradar" style="height:280px"><svg role="img" aria-label="设计结果与目标味道"></svg></div>
    <div class="legend"><span><i style="background:var(--red2)"></i>设计结果</span><span><i style="background:var(--tgt);height:0;border-top:2px dashed var(--tgt)"></i>理想味型</span></div>
    <h3>设计思路</h3><ul class="hint" id="anotes"></ul>
-   <h3>做法</h3><div id="acard" style="font-size:15px"></div><p class="note" id="awarn"></p>
+   <div id="acard" style="font-size:15px"></div><p class="note" id="awarn"></p>
    <div class="fl"><button class="btn pri" id="aopen">在工坊打开</button><button class="btn" id="acardbtn">菜谱卡</button><button class="btn" id="asave">存进我的菜谱</button><button class="btn" id="aalt">比较其他做法</button></div>
    <div class="chips2" id="aalts" style="margin-top:8px"></div>
   </section>
@@ -375,5 +380,5 @@ body:not(.showxd) .prow.xd{display:none}
 <div class="mask" id="cardm"><div class="modal" role="dialog" aria-label="菜谱卡" style="max-width:720px"><div class="mh"><input id="cname" aria-label="菜名"><button class="btn" id="cclose">关闭</button></div>
  <div style="overflow-y:auto;padding:0 16px 16px"><p class="note" id="csum" style="white-space:pre-line;margin:0 0 8px"></p>
   <div class="fl"><label class="unit"><span id="cmainl"></span> <input id="cmain" type="number" min="1" step="50" style="width:90px;border:1px solid var(--line);border-radius:8px;padding:6px;min-height:40px;background:var(--card);font-size:16px;text-align:right"> g</label><button class="btn sm" id="ccopy">复制文字</button><button class="btn sm pri" id="csave">存进我的菜谱</button><span class="note" id="cmsg"></span></div>
-  <div id="cing"></div><h3>做法</h3><ol id="csteps" class="csteps"></ol><textarea id="ctext" hidden></textarea></div></div></div>
+  <div id="cing"></div><ol id="csteps" class="csteps" hidden></ol><textarea id="ctext" hidden></textarea></div></div></div>
 <div class="mask" id="mask"><div class="modal" role="dialog" aria-label="选择食材或调料"><div class="mh"><input id="q" placeholder="搜索：蒜、花椒、五花…"><button class="btn" id="mclose">关闭</button></div><div class="cats" id="mcats"></div><div class="pick" id="mpick"></div></div></div>

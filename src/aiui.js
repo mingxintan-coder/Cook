@@ -31,7 +31,7 @@ function show(r,who){res=r;$('ares').hidden=false;$('astat').textContent=r.ms?`$
   const ft=flavorTypes(r.r.ev.D,r.r.ev.flags);$('atypes').innerHTML=ft.map((t,i)=>`<span class="tag${i?'':' main'}">${esc(t[0])}</span>`).join('')+`<span class="tag">${esc(r.spec.method)}</span><span class="tag">${r.r.ev.color.name}</span>`;
   radarSVG($('aradar').querySelector('svg'),DIMS,r.r.ev.D,r.T);
   $('anotes').innerHTML=(r.notes||[]).map(n=>`<li>${esc(n)}</li>`).join('');
-  const card=recipeCard(r.steps);$('acard').innerHTML=card.ing.map(g=>`<p><b>${g.t}</b>：${g.rows.map(x=>esc(x.name)+' '+x.g+'g'+(x.m?`<span class="note">（${x.m}）</span>`:'')).join('，')}</p>`).join('')+`<ol class="csteps">${card.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol><p class="note">约 ${fmtT(card.total)}</p>`;
+  const card=recipeCard(r.steps);$('acard').innerHTML=cardHTML(card);
   const w=r.r.W.filter(x=>x[0]>=1).map(x=>x[1]);$('awarn').textContent=w.length?'提醒：'+w.slice(0,3).join(' '):'';
   $('ares').scrollIntoView({behavior:'smooth',block:'start'})}
 $('aopen').onclick=()=>{if(!res)return;window.openInEditor({dish:'',steps:JSON.parse(JSON.stringify(res.steps)),fin:res.fin,eat:res.eat,custom:res.name});location.hash='remix'};
@@ -71,9 +71,27 @@ $('pfridge').addEventListener('click',e=>{const b=e.target.closest('button');if(
   else return;saveF();frender()});
 $('ffsel').addEventListener('change',e=>{const row=e.target.closest('.afrow');if(!row)return;F.foods[+row.dataset.i].g=Math.max(20,+e.target.value||100);saveF()});
 $('fpo').onchange=e=>{F.pantryOnly=e.target.checked;saveF();frender()};
-$('fparse').onclick=()=>{const t=$('ftext').value;const ids=parseFoods(t);for(const id of ids)if(!F.foods.some(f=>f.id===id))F.foods.push({id,g:0});
-  for(const f of F.foods)if(!f.g)f.g=defaultG(f.id,F.foods.map(x=>x.id));for(const id of parseSeas(t))if(!F.pantry.includes(id))F.pantry.push(id);
-  $('fstat').textContent=ids.length?`识别出 ${ids.map(i=>FD[i].name).join('、')}`:'没识别出食材，可以直接点选';$('ftext').value='';saveF();frender()};
+const BASES=()=>Object.values(FD).filter(d=>!d.base&&!d.custom);
+let unk=[];
+function addFoods(ids){for(const id of ids)if(!F.foods.some(f=>f.id===id))F.foods.push({id,g:0});for(const f of F.foods)if(!f.g)f.g=defaultG(f.id,F.foods.map(x=>x.id))}
+function unkRender(){const box=$('funk');if(!unk.length){box.innerHTML='';return}
+  box.innerHTML=`<p class="note" style="margin:6px 0">没认出：请选最接近的${sampleFn?'，或让 Claude 识别':''}</p>`+unk.map((w,i)=>`<div class="fl" data-u="${i}" style="margin:4px 0"><b>${esc(w)}</b><span class="unit">当作</span><select>${BASES().map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><button class="btn sm" data-uadd="${i}">加入</button><button class="btn sm" data-udel="${i}">不要</button></div>`).join('')+(sampleFn?`<button class="btn sm" id="uai">让 Claude 识别</button>`:'')}
+$('funk').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.uadd!=null){const i=+b.dataset.uadd;const base=b.parentElement.querySelector('select').value;const id=addCustomFood(unk[i],base);if(id)addFoods([id]);unk.splice(i,1);saveF();unkRender();frender()}
+  else if(b.dataset.udel!=null){unk.splice(+b.dataset.udel,1);unkRender()}
+  else if(b.id==='uai'&&sampleFn){b.disabled=true;b.textContent='Claude 识别中…';
+    const list=BASES().map(d=>`${d.id}=${d.name}(${d.cat})`).join(' ');
+    const prompt=`把下面这些食材各自归到最接近的基础食材（烹饪性质最像：熟得快慢、是否需要久炖、出水、口感）。可选基础食材 id=名称：${list}\n切法可选：${Object.keys(CUTS).join('、')}\n食材：${JSON.stringify(unk)}\n只回复 JSON 数组，每项 {"word":"原词","base":"基础食材id","cut":"常用切法","isFood":true/false}，不是食材（比如调料、饮料）就 isFood=false。`;
+    try{const out=await sampleFn(prompt,{modelTier:'quick'});const m=(out.text||'').match(/\[[\s\S]*\]/);const L=m?JSON.parse(m[0]):[];const got=[];
+      for(const x of L){if(!x||!unk.includes(x.word))continue;if(x.isFood===false){unk=unk.filter(w=>w!==x.word);continue}if(FD[x.base]){const id=addCustomFood(String(x.word).slice(0,12),x.base,x.cut);if(id){addFoods([id]);got.push(x.word+'（按'+FD[x.base].name+'）');unk=unk.filter(w=>w!==x.word)}}}
+      $('fstat').textContent=got.length?'Claude 识别：'+got.join('、'):'Claude 也没认出来，请手动选择';saveF();frender()}
+    catch(err){$('fstat').textContent=err&&err.code==='rate_limited'?'请求太频繁，稍后再试':'识别失败，请手动选择'}
+    unkRender()}});
+$('fparse').onclick=()=>{const t=$('ftext').value;const r=parseFoodsX(t);addFoods(r.ids);for(const id of parseSeas(t))if(!F.pantry.includes(id))F.pantry.push(id);
+  const parts=[];const viaIds=new Set(r.via.map(v=>v[1]));const gs=new Set(r.guessed.map(g=>g[0]));
+  for(const id of r.ids){const d=FD[id];if(d.custom&&gs.has(d.name))parts.push(`${d.name}（按${FD[d.base].name}估）`);else{const v=r.via.find(x=>x[1]===id);parts.push(v&&v[0]!==d.name?`${v[0]}（按${d.name}算）`:d.name)}}
+  unk=[...new Set(unk.concat(r.unknown))];
+  $('fstat').textContent=parts.length?'识别出：'+parts.join('、'):(r.unknown.length?'':'没识别出食材，可以直接点选');$('ftext').value='';saveF();frender();unkRender()};
 $('ftext').addEventListener('keydown',e=>{if(e.key==='Enter')$('fparse').click()});
 $('fgo').onclick=()=>{if(!F.foods.length)return;$('fgo').disabled=true;$('frec').innerHTML='';const input={foods:F.foods,pref:F.pref,pantryOnly:F.pantryOnly,pantry:F.pantry,cons:F.cons};
   const plan=fridgePlan(input);const jobs=plan.jobs;let i=0;$('fstat').textContent=`共 ${jobs.length} 种搭配，正在快速试做…`;

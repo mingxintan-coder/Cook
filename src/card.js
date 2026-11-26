@@ -1,53 +1,98 @@
-// ===== 菜谱卡：把步骤写成人能照着做的菜谱 =====
-const CNAME={pot:'锅',A:'A 碗',B:'B 碗',C:'C 盘'};
+// ===== 菜谱卡：简洁、好操作、不漏关键步骤 =====
 const PIECEW={cong:[15,'根'],sm:[15,'根'],xcai:[5,'根'],suan:[5,'瓣'],jiang:[3,'片'],bj:[2,'颗'],xy:[.3,'片'],gp:[3,'块'],cg:[4,'个'],jd:[50,'个'],xmj:[3,'个'],dx:[.1,'粒'],gla:[.4,'个']};
-const CUTW={'液':'打散','整':'整个','整条':'整条','末':'剁末'};const cutTxt=c=>CUTW[c]||('切'+c);
+const CUTW={'液':'打散','整':'洗净','整条':'整条','末':'剁末','大块':'切大块'};const cutTxt=c=>CUTW[c]||('切'+c);
 const fmtG=g=>g>=100?String(Math.round(g)):g>=10?String(Math.round(g*2)/2).replace(/\.0$/,''):String(Math.round(g*10)/10);
-function measure(id,g){const d=IT[id];if(!d)return'';if(PIECEW[id]){const [w,u]=PIECEW[id];const n=g/w;if(n>=.5&&n<=40)return`约 ${Math.round(n*2)/2} ${u}`}
-  if(d.water||d.oil&&g>=60)return g>=50?`约 ${Math.round(g/10)*10}ml`:'';
+function measure(id,g){const d=IT[id];if(!d)return'';if(PIECEW[id]){const [w,u]=PIECEW[id];const n=g/w;if(n>=.5&&n<=40)return`${Math.round(n*2)/2} ${u}`}
+  if(d.water||d.oil&&g>=60)return g>=50?`${Math.round(g/10)*10}ml`:'';
   const gran=['salt','bt','wj','jj','nrf','bingt','ht','jy'].includes(id),pow=['dian','mf','ljm','hjm','bhj','hhj','wxf','ssx','zr','gl'].includes(id);
   const sp=gran?9:pow?5:10;const ts=sp/3;
-  if(g>=sp*.8){const n=g/sp;return`约 ${Math.round(n*2)/2} 勺`}if(g>=ts*.4){const n=g/ts;return`约 ${Math.round(n*2)/2} 茶勺`}if(g<1)return'少许';return''}
-function oilCue(T){return T<110?'':T<140?'约三四成热，筷子插进去冒小泡':T<170?'约五成热，筷子周围冒密集小泡':T<195?'约六成热，油面微动':T<215?'约七成热，微冒青烟':'冒烟，八成热以上'}
-function recipeCard(steps,opts){opts=opts||{};const k=opts.scale||1;steps=JSON.parse(JSON.stringify(steps));const sim=simulate(steps);const marks=sim.marks;
-  // 用料分组
-  const lastHeat=steps.reduce((a,s,i)=>s.t==='heat'?i:a,-1);
-  const groups={'主料':[],'腌料（A 碗）':[],'碗汁（B 碗）':[],'调料':[],'出锅时':[]};
-  const seen={};
-  steps.forEach((s,i)=>{if(s.t!=='add')return;const d=FD[s.id]||IT[s.id];if(!d)return;let g='调料';
-    if(FD[s.id])g=s.c==='A'?'腌料（A 碗）':'主料';else if(s.c==='A')g='腌料（A 碗）';else if(s.c==='B')g='碗汁（B 碗）';else if(i>lastHeat)g='出锅时';
-    const key=g+'|'+s.id+'|'+(s.cut||'');if(seen[key]){seen[key][1]+=s.g*k;return}const row=[d.name,s.g*k,s.id,(FD[s.id]?(s.cut||d.cut)+(s.prep==='blanch'?'，焯水':s.prep==='preboil'?'，煮熟':''):'')+(s.est?(FD[s.id]?'，':'')+'估':'')];seen[key]=row;groups[g].push(row)});
-  const ing=Object.entries(groups).filter(([,r])=>r.length).map(([t,rows])=>({t,rows:rows.map(r=>({name:r[0],g:fmtG(r[1]),m:FD[r[2]]?'':measure(r[2],r[1]),note:r[3]}))}));
-  // 步骤
-  const out=[];let buf=[];let bufC='pot';
-  let aPending=false;
-  const flush=(tail)=>{if(!buf.length&&!tail)return;let s='';if(buf.length){s=(bufC==='pot'?'锅里下':`${CNAME[bufC]}里放`)+buf.join('、');if(!tail&&bufC==='B')s+='，调匀成碗汁';if(!tail&&bufC==='A')s+='，抓匀'}if(tail)s+=(s?'，':'')+tail;out.push(s+'。');buf=[]};
-  const T=i=>{const m=marks[i+1];const p=sim.potLog[Math.max(0,(m?m.t:sim.t)-1)];return p?p.T:22};
-  const W=i=>{const m=marks[i+1];const h=sim.hist;let best=h[0];for(const x of h)if(x.t<=(m?m.t:sim.t))best=x;return best};
-  steps.forEach((s,i)=>{
-    if(s.t==='add'){const d=FD[s.id]||IT[s.id];if(!d)return;const c=s.c||'pot';if(buf.length&&c!==bufC)flush();bufC=c;if(c==='A')aPending=true;
-      let txt=`${d.name} ${fmtG(s.g*k)}g`;if(FD[s.id])txt+=`（${cutTxt(s.cut||d.cut)}${s.prep==='blanch'?'，先焯水':s.prep==='preboil'?'，先煮熟':''}）`;buf.push(txt)}
-    else if(s.t==='heat'){const f=['','小火','中火','大火'][+s.f||2];const t1=T(i);const w=W(i);let dur=s._ran!=null?s._ran:s.s;let h;
-      const nx=steps[i+1];if(nx&&nx.t==='heat'&&!nx.u&&!s.u&&+nx.f===+s.f&&!!nx.lid===!!s.lid&&(nx.m||'wok')===(s.m||'wok')){nx._carry=(nx._carry||0)+dur+(s._carry||0);return}
-      dur+=s._carry||0;delete s._carry;if(dur<5&&!s.u)return;
-      if(s.m==='steam')h=`上锅隔水${f}蒸 ${fmtT(dur)}`;
-      else if(s.u==='boil')h=`${f}烧开${dur>20?'（约 '+fmtT(dur)+'）':''}`;
-      else if(s.u==='temp')h=`${f}把油烧到约 ${Math.round(t1)}°C（${oilCue(t1)}）`;
-      else if(s.u==='reduce')h=`开盖${f}收汁到浓稠${dur>20?'（约 '+fmtT(dur)+'）':''}`;
-      else{const m=marks[i+1];const pl=sim.potLog[Math.max(0,(m?m.t:sim.t)-1)]||{};const wet=!!pl.wet;const onlyOil=!pl.food&&!pl.items;
-        if(onlyOil&&!wet)h=`${f}把油烧热约 ${fmtT(dur)}（约 ${Math.round(t1)}°C，${oilCue(t1)||'温油'}）`;
-        else{h=`${s.lid?'盖盖':''}${f}${wet?(dur>=600?'炖':'煮'):pl.food?(pl.oil>150?'炸':dur>=150?'煸炒':'翻炒'):'炒香'} ${fmtT(dur)}`;if(!wet&&t1>110)h+=`（锅温约 ${Math.round(t1)}°C）`}}
-      if(buf.length&&bufC!=='pot')flush();flush(h)}
-    else if(s.t==='rest'){const lastC=bufC;if(buf.length&&bufC!=='pot')flush();const heated=steps.slice(0,i).some(x=>x.t==='heat');
-      if(aPending){out.push(`A 碗的料抓匀，腌 ${fmtT(s.s)}。`);aPending=false}
-      else if(lastC==='B'||lastC==='C'){out.push(`拌匀，静置 ${fmtT(s.s)} 入味。`)}
-      else if(!heated){if(buf.length)flush('抓匀，腌 '+fmtT(s.s));else out.push(`腌 ${fmtT(s.s)}。`)}
-      else out.push(`关火${s.lid?'盖盖':''}静置 ${fmtT(s.s)}。`)}
-    else if(s.t==='pour'){flush();const from=CNAME[s.from],to=CNAME[s.to||'pot'];out.push(s.what==='foods'?`把 ${from}里的食材盛到 ${to}，汤汁留着。`:s.from==='B'?`${from}的料汁搅匀，倒进${to}。`:s.from==='A'?`把 ${from}腌好的料下${to}。`:(s.from==='pot'&&!sim.cs.pot.foods.length&&i>0&&steps[i-1].t==='heat'?`把热油浇到${to}上。`:`把 ${from}里的东西倒进${to}。`))}
-    else if(s.t==='drain'){flush();out.push(s.kind==='water'?(+s.keep?`倒掉多余汤汁，只留约 ${s.keep}g。`:'倒掉蒸出来的汤汁。'):`倒出多余的油，留底油约 ${s.keep}g。`)}
-    else if(s.t==='remove'){flush();out.push(`捞出${(IT[s.id]||{name:'料'}).name}。`)}});
-  flush();
-  return{ing,steps:out.filter(x=>x&&x!=='。'),total:sim.t}}
-function cardText(name,card,extra){let t=`【${name}】\n`;if(extra)t+=extra+'\n';t+='\n用料\n';for(const g of card.ing){t+=`· ${g.t}：`+g.rows.map(r=>`${r.name} ${r.g}g${r.m?'（'+r.m+'）':''}${r.note?'〔'+r.note+'〕':''}`).join('，')+'\n'}
-  t+=`\n做法（约 ${fmtT(card.total)}）\n`+card.steps.map((s,i)=>`${i+1}. ${s}`).join('\n');return t}
+  if(g>=sp*.8){const n=g/sp;return`${Math.round(n*2)/2} 勺`}if(g>=ts*.4){const n=g/ts;return`${Math.round(n*2)/2} 茶勺`}if(g<1)return'少许';return''}
+function dur(s){s=Math.round(s);if(s<60)return`${Math.max(5,Math.round(s/5)*5)} 秒`;if(s<600){const m=Math.floor(s/60),r=s%60;return r>=20&&r<=40?`${m} 分半`:`${Math.round(s/60)} 分钟`}
+  if(s<3600)return`${Math.round(s/300)*5} 分钟`;const h=Math.floor(s/3600),m=Math.round((s%3600)/300)*5;return m?`${h} 小时 ${m} 分`:`${h} 小时`}
+function oilCue(T){return T<140?'三四成热，筷子周围冒小泡':T<170?'五成热，筷子周围冒密集小泡':T<195?'六成热，油面微微晃动':T<215?'七成热，微冒青烟':'冒烟'}
+const short=n=>n.replace(/[（(].*?[）)]/g,'').split('/')[0];
+const PASTE=['db','tmj','hdj','ds','zhj','fqj','hgdl','dj','pj','csj','hxj'],CHILI=['gla','hj','qhj','hjm','ljm','zr'],AROMA=['cong','jiang','suan','yc','sm','xmj'],SUGAR=['bt','bingt','ht','fm'];
+function recipeCard(steps0,opts){opts=opts||{};const k=opts.scale||1;const steps=JSON.parse(JSON.stringify(steps0));const sim=simulate(steps);const M=sim.marks;
+  const name=id=>short((FD[id]||IT[id]||{name:'?'}).name);
+  const lastHeat=steps.reduce((a,s,i)=>s.t==='heat'?i:a,-1);const pourIdx=c=>steps.findIndex(s=>s.t==='pour'&&s.from===c&&(s.to||'pot')==='pot');
+  const groups={'主料':[],'腌料':[],'碗汁':[],'调料':[],'出锅时':[]};const seen={};const uses={};
+  steps.forEach((s,i)=>{if(s.t!=='add')return;uses[s.id]=(uses[s.id]||0)+1;const d=FD[s.id]||IT[s.id];if(!d)return;let g='调料';
+    if(FD[s.id])g='主料';else if(s.c==='A'&&pourIdx('A')>i)g='腌料';else if(s.c==='B'&&pourIdx('B')>i)g='碗汁';else if(i>lastHeat&&lastHeat>=0)g='出锅时';
+    const key=g+'|'+s.id;if(seen[key]){seen[key][1]+=s.g*k;return}const row=[d.name,s.g*k,s.id,(FD[s.id]?cutTxt(s.cut||d.cut):'')+(s.est?(FD[s.id]?'，':'')+'估':'')];seen[key]=row;groups[g].push(row)});
+  const ing=Object.entries(groups).filter(([,r])=>r.length).map(([t,rows])=>({t,rows:rows.map(r=>({name:short(r[0]),g:fmtG(r[1]),m:FD[r[2]]?'':measure(r[2],r[1]),note:r[3]}))}));
+  const nm=s=>{const n=name(s.id);return uses[s.id]>1&&!FD[s.id]?`${n} ${fmtG(s.g*k)}g`:n};
+  const list=a=>a.length<=1?a.join(''):a.slice(0,-1).join('、')+'和'+a[a.length-1];
+  // 备料
+  const prep=[];const foods=steps.filter(s=>s.t==='add'&&FD[s.id]);
+  const cutL=[...new Map(foods.map(s=>[s.id,s])).values()].map(s=>`${name(s.id)}${cutTxt(s.cut||FD[s.id].cut)}`);
+  if(cutL.length)prep.push({t:'切配',x:cutL.join('，')});
+  const bl=foods.filter(s=>s.prep==='blanch'),pb=foods.filter(s=>s.prep==='preboil');
+  if(bl.length)prep.push({t:'焯水',x:`${list(bl.map(s=>name(s.id)))}冷水下锅，水开后撇去浮沫再煮 1–2 分钟，捞出用温水洗净`,key:1});
+  if(pb.length)prep.push({t:'预煮',x:`${list(pb.map(s=>name(s.id)))}冷水下锅煮到筷子能扎透，捞出放凉${pb.some(s=>['片','丝','丁'].includes(s.cut))?'再切':''}`,key:1});
+  const used=new Set();
+  for(const c of['A','B']){const pi=pourIdx(c);if(pi<0)continue;const adds=steps.map((s,i)=>[s,i]).filter(([s,i])=>s.t==='add'&&s.c===c&&i<pi);if(!adds.length)continue;adds.forEach(([,i])=>used.add(i));
+    const fs=adds.filter(([s])=>FD[s.id]).map(([s])=>name(s.id)),ss=adds.filter(([s])=>!FD[s.id]).map(([s])=>nm(s));
+    if(c==='A'||fs.length){let rest=0;steps.forEach((s,i)=>{if(s.t==='rest'&&i<pi&&i<steps.findIndex(x=>x.t==='heat'||x.t==='pour')+1){rest+=s.s;used.add(i)}});prep.push({t:'腌制',x:`${list(fs)||'食材'}加${list(ss)}抓匀${rest?`，腌 ${dur(rest)}`:''}`})}
+    else prep.push({t:'调碗汁',x:`${list(ss)}放一碗搅匀备用`})}
+  // C 盘里只放了预处理食材、之后倒进锅：算备料
+  const pc=pourIdx('C');const cPrep=pc>=0&&!steps.slice(0,pc).some(x=>x.t==='pour'&&x.to==='C');let cFoods=[];
+  if(cPrep){steps.forEach((x,i)=>{if(i<pc&&x.t==='add'&&x.c==='C'&&FD[x.id]){used.add(i);cFoods.push(name(x.id))}})}
+  // 做法
+  const cook=[];let buf=[];const potState=i=>{const m=M[i+1];return sim.potLog[Math.max(0,(m?m.t:sim.t)-1)]||{}};
+  const firstHeat=steps.findIndex(x=>x.t==='heat');const prev0=()=>cook[cook.length-1];
+  steps.forEach((s,i)=>{if(used.has(i))return;if(s.t==='rest'&&i<firstHeat&&!buf.length)return;
+    if(s.t==='rest'&&i<firstHeat&&buf.length){const fs=buf.filter(a=>FD[a.id]).map(a=>name(a.id)),ss=buf.filter(a=>!FD[a.id]).map(nm);buf=[];
+      const st=steps.slice(i+1).find(x=>x.t==='heat');cook.push({t:'腌制',x:`${list(fs)||'食材'}${st&&st.m==='steam'?'放进蒸盘，铺上':'加'}${list(ss)}，腌 ${dur(s.s)}`});return}
+    if(s.t==='add'){buf.push(s);return}
+    if(s.t==='heat'){const side=buf.filter(a=>a.c&&a.c!=='pot');const adds=buf.filter(a=>!a.c||a.c==='pot');buf=[];
+      if(side.length)cook.push({t:'调味',x:`${list(side.map(a=>FD[a.id]?name(a.id):nm(a)))}放在菜上`});
+      const p=potState(i);const f=['','小火','中火','大火'][+s.f||2];const d0=s._ran!=null?s._ran:s.s;
+      const ids=adds.map(a=>a.id);const onlyOil=adds.length&&adds.every(a=>IT[a.id]&&IT[a.id].oil);
+      let t='下料',x='',key=0;const addTxt=adds.length?(onlyOil?`锅烧热倒入${list(adds.map(nm))}`:`下${list(adds.map(a=>FD[a.id]?name(a.id):nm(a)))}`):'';
+      const pre=addTxt?addTxt+'，':'';
+      if(s.m==='steam'){t='蒸';x=`${pre}水开后上锅${f}蒸 ${dur(d0)}`;key=1}
+      else if(s.u==='temp'){t='热油';x=`${addTxt||'把油'}${addTxt?'，':''}${f}烧到${oilCue(+s.v||160)}`;key=1}
+      else if(s.u==='boil'){t='烧开';x=`${pre}大火烧开${d0>120?`（约 ${dur(d0)}）`:''}，撇去浮沫`}
+      else if(s.u==='reduce'){t='收汁';x=`${pre}开盖大火收汁，边收边翻，汤汁浓稠挂勺即可`;key=1}
+      else if(p.wet){if(s.lid&&d0>=600){t='炖煮';x=`${pre}盖盖${f}炖 ${dur(d0)}`;key=1}else if(ids.includes('dian')){t='勾芡';x=`${pre}${f}翻匀至汤汁浓稠`}else{t=addTxt?'下料':'煮';x=`${pre}${f}煮 ${dur(d0)}`}}
+      else if(onlyOil){t='热油';x=`${addTxt}，${f}烧到${oilCue(p.T||160)}`;key=1}
+      else if(ids.some(id=>SUGAR.includes(id))&&!p.food&&d0>=90){t='炒糖色';x=`${addTxt}，${f}慢炒至枣红色、冒细密小泡（约 ${dur(d0)}），别炒黑`;key=1}
+      else if(ids.some(id=>CHILI.includes(id))&&!adds.some(a=>FD[a.id])&&!p.food){t='炝锅';x=`${addTxt}，${f}炸出香味、颜色变深即可（约 ${dur(d0)}），别炸黑`;key=1}
+      else if(ids.some(id=>PASTE.includes(id))&&!adds.some(a=>FD[a.id])){t='炒酱';x=`${addTxt}，${f}慢炒${ids.includes('db')?'出红油':'出香味'}（约 ${dur(d0)}）`;key=1}
+      else if(adds.length&&adds.every(a=>AROMA.includes(a.id)||CHILI.includes(a.id)||IT[a.id]&&IT[a.id].oil)){t='爆香';x=`${addTxt}，${f}爆香（约 ${dur(d0)}）`}
+      else if(prev0()&&prev0().t==='倒碗汁'&&!addTxt){prev0().x=`碗汁搅匀后沿锅边倒入，${f}快速翻匀，汁裹满即可（约 ${dur(d0)}）`;return}
+      else if(p.oil>150&&p.food){t='炸';x=`${pre}${f}炸至金黄（约 ${dur(d0)}）`;key=1}
+      else{const af=adds.filter(a=>FD[a.id]);const meat=af.some(a=>['肉','禽','水产'].includes(FD[a.id].cat));const bean=af.some(a=>FD[a.id].bean);
+        t=af.length?(meat?'滑炒':'炒'):'翻炒';const cue=bean?'煸至表皮起皱、彻底熟透':meat?'炒至变色':af.length?'炒至断生':(p.food?'翻炒':'翻匀');x=`${pre}${f}${cue}（约 ${dur(d0)}）`;if(bean)key=1}
+      if(s.lid&&!/盖盖/.test(x))x=x.replace(/(小火|中火|大火)/,'盖盖$1');
+      const prev=cook[cook.length-1];
+      if(p.wet&&!s.lid&&+s.f===3&&!addTxt&&prev&&prev.t==='炖煮'&&!s.u){cook.push({t:'收汁',x:`开盖大火收汁约 ${dur(d0)}，汤汁浓稠挂勺即可`,key:1});return}
+      if(prev&&prev.t==='烧开'&&t==='炖煮'&&!addTxt){prev.x+=`，转${x}`;prev.t='炖煮';prev.key=1;return}
+      if(!addTxt&&prev&&['下锅','回锅'].includes(prev.t)&&!p.wet&&!s.u&&s.m!=='steam'){prev.x+=`，${f}翻炒${prev.t==='下锅'?'至变色':'均匀'}（约 ${dur(d0)}）`;return}
+      if(adds.length&&adds.every(a=>IT[a.id]&&IT[a.id].alc)&&!p.wet){cook.push({t:'烹酒',x:`沿锅边淋入${list(adds.map(nm))}，${f}翻炒去腥（约 ${dur(d0)}）`});return}
+      if(prev&&prev.t==='下料'&&/大火煮 (\d+ 秒|\d+ 分[钟半]?)$/.test(prev.x)&&t==='炖煮'&&!addTxt){prev.x=prev.x.replace(/大火煮 [^，]*$/,'大火烧开')+`，转${x}`;prev.t='炖煮';prev.key=1;return}
+      if(prev&&prev.t==='炖煮'&&t==='炖煮'&&!addTxt&&prev.rm){prev.x+=`，再${x.replace('盖盖','')}`;return}
+      if(prev&&prev.t===t&&!addTxt&&['滑炒','炒','翻炒','煮','炸'].includes(t)){const vb={'炸':'复炸','煮':'煮'}[t]||'炒';prev.x+=`，再${f}${vb} ${dur(d0)}`;return}
+      cook.push({t,x,key});return}
+    if(s.t==='remove'){const prev=cook[cook.length-1];const n=name(s.id);if(prev&&prev.t==='炖煮'){if(!prev.rm){prev.rm=[n];prev.x+=`，捞出${n}`}else{prev.rm.push(n);prev.x=prev.x.replace(/捞出[^，]*$/,`捞出${list(prev.rm)}`)}}else cook.push({t:'捞出',x:`捞出${n}`});return}
+    const adds=buf;buf=[];if(adds.length){const pot=adds.filter(a=>!a.c||a.c==='pot');const other=adds.filter(a=>a.c&&a.c!=='pot');if(pot.length)cook.push({t:'下料',x:`下${list(pot.map(a=>FD[a.id]?name(a.id):nm(a)))}`});if(other.length)cook.push({t:'调味',x:`${list(other.map(a=>FD[a.id]?name(a.id):nm(a)))}放在菜上`})}
+    if(s.t==='pour'){const from=s.from,to=s.to||'pot';
+      if(from==='A'&&to==='pot')cook.push({t:'下锅',x:'下腌好的料，迅速划散'});
+      else if(from==='B'&&to==='pot')cook.push({t:'倒碗汁',x:'碗汁搅匀后沿锅边倒入，快速翻匀',key:1});
+      else if(from==='pot'&&s.what==='foods')cook.push({t:'盛出',x:'盛出备用，锅里留底油'});
+      else if(from==='C'&&to==='pot')cook.push(cPrep&&i===pc&&cFoods.length?{t:'下锅',x:`下处理好的${list(cFoods)}`}:{t:'回锅',x:'倒回盛出的料'});
+      else if(from==='pot'&&!sim.cs.pot.foods.length&&cook.length&&cook[cook.length-1].t==='热油'){const pr=cook.pop();cook.push({t:'泼油',x:pr.x.replace(/^锅烧热倒入/,'另起锅烧热')+'，趁热浇在菜上',key:1})}
+      else cook.push({t:'装盘',x:'盛进盘里'})}
+    else if(s.t==='drain')cook.push({t:s.kind==='water'?'倒汤':'控油',x:s.kind==='water'?(+s.keep?`倒掉多余汤汁，留约 ${s.keep}g`:'倒掉蒸出来的汤汁'):`倒出多余的油，锅里留约 ${s.keep}g`});
+    else if(s.t==='rest')cook.push({t:'静置',x:`${s.lid?'盖盖':''}静置 ${dur(s.s)}${['B','C'].includes(steps[i-1]&&steps[i-1].c)?'入味':''}`})});
+  if(buf.length){const v=buf.some(a=>['xyou','hjy','tjy','hyou','cyou'].includes(a.id));cook.push({t:'出锅',x:`${cook.length?'出锅前':''}${v?'淋入':'放入'}${list(buf.map(a=>FD[a.id]?name(a.id):nm(a)))}，翻匀出锅`})}
+  else if(cook.length&&!['出锅','装盘','泼油','静置'].includes(cook[cook.length-1].t))cook[cook.length-1].x+='，出锅';
+  for(const c of prep.concat(cook))if(!/[。！]$/.test(c.x))c.x+='。';
+  return{ing,prep,cook,steps:prep.concat(cook).map(s=>`【${s.t}】${s.x}`),total:sim.t}}
+function cardHTML(card){const li=L=>L.map(s=>`<li${s.key?' class="key"':''}><b>${s.t}</b>${s.key?'<span class="kb">关键</span>':''} ${esc(s.x)}</li>`).join('');
+  return `<div class="ing">${card.ing.map(g=>`<p><b>${g.t}</b>　${g.rows.map(x=>`<span class="it">${esc(x.name)} ${x.g}g${x.m?`<span class="note">（${x.m}）</span>`:''}${/估/.test(x.note)?'<span class="note">·估</span>':''}</span>`).join('')}</p>`).join('')}</div>`+
+   (card.prep.length?`<h3>备料</h3><ol class="csteps">${li(card.prep)}</ol>`:'')+`<h3>做法 <span class="note">约 ${dur(card.total)}</span></h3><ol class="csteps">${li(card.cook)}</ol>`}
+function cardText(name,card,extra){let t=`【${name}】\n`;if(extra)t+=extra+'\n';t+='\n用料\n';for(const g of card.ing){t+=`· ${g.t}：`+g.rows.map(r=>`${r.name} ${r.g}g${r.m?'（'+r.m+'）':''}`).join('，')+'\n'}
+  if(card.prep.length)t+='\n备料\n'+card.prep.map((s,i)=>`${i+1}. ${s.t}：${s.x}`).join('\n')+'\n';
+  t+=`\n做法（约 ${dur(card.total)}）\n`+card.cook.map((s,i)=>`${i+1}. ${s.key?'★':''}${s.t}：${s.x}`).join('\n');return t}
 if(typeof module!=='undefined')module.exports={recipeCard,cardText};

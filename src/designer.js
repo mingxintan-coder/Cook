@@ -110,7 +110,7 @@ function designSearch(spec,T,fin,eat,amt,ev,t0,budgetMs){
   const fx=fixCooking(best.S,fin,eat,8);const steps=fx.steps;const r=runEval(steps,fin,eat);const L=designScore(r,T,spec);
   return{spec,steps,fin,eat,r,T,L,score:Math.max(0,Math.round(100-L*3)),name:dishName(spec),notes:designNotes(spec,steps,r),ms:Date.now()-t0}}
 const NAMES={'fq+jd|茄汁':'番茄炒蛋','jd+qjz|咸鲜':'青椒炒蛋','jc2+jd|咸鲜':'韭菜炒蛋','jd+mr|咸鲜':'木耳炒蛋','hg+jd|咸鲜':'黄瓜炒蛋','jd+xia|咸鲜':'虾仁炒蛋','lji+qjz|咸鲜':'青椒肉丝','qz+rm|鱼香':'鱼香肉末茄子','lji+mr|鱼香':'鱼香肉丝','jd+xhs|茄汁':'番茄炒蛋','dfu+rm|麻辣':'麻婆豆腐','nr+td|红烧':'土豆烧牛肉','nn+td|红烧':'土豆烧牛腩','pg|糖醋':'糖醋排骨','wh|红烧':'红烧肉','td|酸辣':'酸辣土豆丝','yr|孜然':'孜然羊肉','yr|葱爆':'葱爆羊肉','jt|宫保':'宫保鸡丁','jx|宫保':'宫保鸡丁','xia|宫保':'宫保虾球','baic|酸辣':'酸辣白菜','xlh|蒜香':'蒜蓉西兰花','qz|鱼香':'鱼香茄子','dou|家常':'干煸四季豆','dou|麻辣':'干煸四季豆'};
-function dishName(spec){const key=spec.foods.map(f=>f.id).sort().join('+')+'|'+spec.style;if(NAMES[key])return NAMES[key];const st=STYLES[spec.style];const fn=spec.foods.map(f=>FD[f.id].name.replace(/\(.*\)|（.*）/g,'').split('/')[0]);
+function dishName(spec){const key=spec.foods.map(f=>f.id).sort().join('+')+'|'+spec.style;if(NAMES[key])return NAMES[key];const rk=spec.foods.map(f=>{let x=f.id;while(FD[x].base&&FD[FD[x].base])x=FD[x].base;return x}).sort().join('+')+'|'+spec.style;if(NAMES[rk]&&spec.foods.every(f=>!FD[f.id].base))return NAMES[rk];const st=STYLES[spec.style];const fn=spec.foods.map(f=>FD[f.id].name.replace(/\(.*\)|（.*）/g,'').split('/')[0]);
   let pre=st.pre;if(spec.style==='咸鲜')pre={'快炒':'清炒','红烧':'红烧','炖':'清炖','蒸':'清蒸','干煸':'干煸','凉拌':'凉拌'}[spec.method]||'清炒';
   if(spec.method==='干煸'&&spec.style!=='咸鲜')pre='干煸';if(spec.method==='凉拌'&&spec.style!=='咸鲜')pre=pre+'拌';
   return pre+fn.join('')}

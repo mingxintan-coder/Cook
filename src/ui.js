@@ -98,7 +98,7 @@ function setV(v){vmode=v;document.body.classList.toggle('simple',v==='simple');$
 $('vmode').onclick=e=>{const b=e.target.closest('button');if(b)setV(b.dataset.v)};
 function simpleView(){const box=$('simpleView');if(!st.steps.length){box.innerHTML='<p class="note">空锅。切到“详细编辑”下料，或去“AI 设计菜”让程序设计一道。</p>';return}
   let card;try{card=recipeCard(st.steps)}catch(e){box.textContent='';return}
-  box.innerHTML=card.ing.map(g=>`<p style="margin:4px 0"><b>${g.t}</b>：${g.rows.map(x=>esc(x.name)+' '+x.g+'g'+(/估/.test(x.note)?'<span class="note">(估)</span>':'')+(x.m?`<span class="note">（${x.m}）</span>`:'')).join('，')}</p>`).join('')+`<h3>做法 <span class="note">约 ${fmtT(card.total)}</span></h3><ol class="csteps">${card.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol><div class="fl"><button class="btn sm" id="toCard">菜谱卡 / 存菜谱</button><button class="btn sm" id="toFull">改步骤、用量和火候 →</button></div>`;
+  box.innerHTML=cardHTML(card)+`<div class="fl"><button class="btn sm" id="toCard">菜谱卡 / 存菜谱</button><button class="btn sm" id="toFull">改步骤、用量和火候 →</button></div>`;
   $('toFull').onclick=()=>setV('full');$('toCard').onclick=()=>$('wcard').click()}
 function compute(){
   let sim,ev;try{sim=simulate(st.steps);ev=evaluate(sim,st.fin,st.eat)}catch(err){console.error(err);return}

@@ -42,6 +42,9 @@ const A=[
 ['西红柿','fq'],['番茄','fq'],['金针菇','jzg'],['香菇','xg'],['蘑菇','xg'],['平菇','xg'],['鲜蘑','xg'],['口蘑','xg'],['杏鲍菇','xg'],['木耳','mr'],['胡萝卜','hlb'],['萝卜','lb'],['黄瓜','hg'],['西葫芦','hg'],['粉丝','ms'],['粉条','ms'],['豆角','dou'],['四季豆','dou'],['芸豆','dou'],['豆芽','dy'],['芹菜','qc'],['香芹','qc'],['韭菜','jc2'],['西兰花','xlh'],['菜花','xlh'],['冬瓜','dg'],['南瓜','dg'],['莲藕','ou'],['藕','ou'],['面条','mt'],['年糕','mt'],['米饭','mfan'],['火腿','huot'],['腊肉','huot'],['培根','huot'],['香肠','huot'],['午餐肉','huot'],
 ['油','hsy'],['汤','gt'],['水','qs'],
 ];
+// 新增的具体食材：名称和别名排在通用食材前面
+{const extra=[];for(const d of Object.values(FD)){if(!d.base&&!['gclam','gbs'].includes(d.id))continue;const ws=d.name.replace(/[（(]([^）)]*)[）)]/g,'/$1').split(/[\/、]/).concat(d.al||[]).filter(w=>w&&w.length>=2);for(const w of ws)extra.push([w,d.id])}
+ extra.sort((a,b)=>b[0].length-a[0].length);const at=A.findIndex(x=>x[0]==='五花');A.splice(at,0,...extra)}
 const GRAN=new Set(['salt','bt','wj','jj','nrf','jy','bingt','ht']);const POW=new Set(['dian','mf','ljm','hjm','bhj','hhj','wxf','ssx','zr','gl','zm']);
 const PIECE={suan:5,jiang:3,bj:2,xy:.3,gla:.4,gp:3,cg:4,dx:.1,hj:.05,jd:50,xmj:3,qjz:80,td:200,fq:180,yc:200,hlb:150,hg:200,qz:250,lb:500,bingt:6,fr:15,xcai:5,mr:2,xg:15,jdq:30,xc:15,cp:2,sn:2,bk:.5,rdk:3,gcao:1,hhj:.05,xhx:.05,jz:60,jc:50,zt:500,yu:600,xia:20,dfu:300,bcai:30,baic:800,qcai:40,mt:150,gdf:100,huot:100,jx:250,jt:200,yr:500,pg:500,nn:500,zg:200,fc:300,yy:200,dou:10,dy:200,qc:50,jc2:200,xlh:400,dg:500,ou:300,ms:50,mfan:200,hs:1,sm:20,gzqi:3,lbao:20};
 function norm(n){return String(n).replace(/[（(][^）)]*[）)]/g,'').replace(/\s+/g,'').trim()}

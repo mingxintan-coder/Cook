@@ -47,8 +47,7 @@ window.openCard=openCard;
 function paintCard(){const card=recipeCard(C.steps,{scale:C.k});const ev=evaluate(simulate(C.steps),C.fin,C.eat);const types=flavorTypes(ev.D,ev.flags).map(t=>t[0]).join(' · ');
   C.card=card;C.summary=`${types}｜${ev.color.name}｜${ev.sauce}｜约 ${fmtT(card.total)}${C.k!==1?'｜用料已按主料换算 ×'+C.k.toFixed(2)+'，时间仍按原量':''}`;
   $('csum').textContent=C.summary+(C.note?'\n'+C.note:'');
-  $('cing').innerHTML=card.ing.map(g=>`<h3>${g.t}</h3><table class="ctab"><tbody>${g.rows.map(r=>`<tr><td>${esc(r.name)}${r.note?`<span class="note">　${esc(r.note)}</span>`:''}</td><td class="n">${r.g} g</td><td class="note">${r.m||''}</td></tr>`).join('')}</tbody></table>`).join('');
-  $('csteps').innerHTML=card.steps.map(s=>`<li>${esc(s)}</li>`).join('')}
+  $('cing').innerHTML=cardHTML(card);$('csteps').innerHTML=''}
 $('cmain').oninput=e=>{if(!C||!C.main)return;const v=+e.target.value;if(v>0){C.k=v/C.main;paintCard()}};
 $('cclose').onclick=()=>$('cardm').classList.remove('on');$('cardm').onclick=e=>{if(e.target.id==='cardm')$('cardm').classList.remove('on')};
 $('ccopy').onclick=async()=>{const t=cardText($('cname').value||C.name,C.card,C.summary+(C.note?'\n'+C.note:''));try{await navigator.clipboard.writeText(t);$('cmsg').textContent='已复制'}catch(e){$('ctext').hidden=false;$('ctext').value=t;$('cmsg').textContent='复制被拦截，文字已放在下面'}};
