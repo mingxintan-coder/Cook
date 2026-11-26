@@ -211,6 +211,13 @@ body.simple #raroma{display:none}
 #moreData>summary{font-weight:700;min-height:44px}
 .feas{font-size:12px;border-radius:5px;padding:0 5px;margin-left:4px}.feas.f高{background:var(--ok);color:#fff}.feas.f中{background:var(--warn);color:#fff}.feas.f低{background:var(--bad);color:#fff}
 body:not(.showxd) .prow.xd{display:none}
+
+#aimode button[aria-pressed=true],#ftime button[aria-pressed=true],#fpref .seg button[aria-pressed=true]{background:var(--red2);color:#fff}
+.frow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--bg);border-radius:12px;padding:10px;margin:8px 0;border:1.5px solid var(--line)}
+.frow.first{border-color:var(--red2)}.frow .fs{font:900 28px/1 "Noto Serif SC",serif;color:var(--red2);text-align:center}.frow .fs small{display:block;font-size:11px;color:var(--mute);font-weight:500}
+.frow b{font-size:17px}.frow .note{display:block}
+#fpref .prow{grid-template-columns:40px minmax(0,1fr)}
+[hidden]{display:none!important}
 </style></head><body>
 <header class="top">
  <h1>锅气 · 中餐调味模拟器</h1>
@@ -328,7 +335,19 @@ body:not(.showxd) .prow.xd{display:none}
 </main>
 <main class="wrap view" id="v-ai" hidden>
  <div class="grid">
-  <section class="card"><h2>想做什么菜</h2>
+  <section class="card"><span class="seg" id="aimode" style="margin-bottom:10px"><button data-v="fridge">冰箱有什么</button><button data-v="spec">指定味型做法</button></span>
+  <div id="pfridge">
+   <h2>家里有什么</h2><p class="note" style="margin:0 0 6px">输入或点选现有食材，程序会把能搭的组合、各种味型和做法都试一遍，按你的口味挑出最好吃的几道。</p>
+   <div class="fl"><input id="ftext" placeholder="例如：鸡胸肉 土豆 青椒 鸡蛋 番茄" style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn" id="fparse">识别</button></div>
+   <div class="chips" id="ffcats" style="margin-top:8px"></div><div class="sgrid" id="ffgrid"></div><div id="ffsel"></div>
+   <h3>口味</h3><div id="fpref"></div>
+   <h3>时间</h3><span class="seg" id="ftime"></span>
+   <h3>调料</h3><label class="unit"><input type="checkbox" id="fpo"> 只用家里有的调料（点掉没有的）</label><div class="chips2" id="fpan" style="margin-top:6px"></div>
+   <h3>限制</h3><div class="chips2" id="fcons"></div>
+   <div class="fl" style="margin-top:14px"><button class="btn pri" id="fgo">推荐最好吃的做法</button></div><p class="note" id="fstat"></p>
+   <div id="frec"></div>
+  </div>
+  <div id="pspec" hidden><h2>想做什么菜</h2>
    <h3>主料（最多 3 样）</h3><div class="chips" id="afcats"></div><div class="sgrid" id="afgrid"></div><div id="afsel"></div>
    <h3>味型</h3><div class="chips2" id="astyle"></div>
    <h3>做法</h3><span class="seg" id="amethod"></span>
@@ -337,7 +356,7 @@ body:not(.showxd) .prow.xd{display:none}
    <div class="fl" style="margin-top:14px"><button class="btn pri" id="ago">设计这道菜</button><button class="btn" id="achef" hidden>请 Claude 主厨设计</button><button class="btn sm" id="astop" hidden>停止</button></div>
    <p class="note" id="achefnote" hidden style="margin:6px 0 0">“设计这道菜”在本机几秒算完；Claude 主厨会自己构思，在模拟器里试做几次再改，约需 1 分钟。</p>
    <p class="note" id="astat"></p>
-  </section>
+  </div></section>
   <section class="card res" id="ares" hidden><div class="score"><div><h2 id="aname" style="font-size:28px"></h2><div class="tags" id="atypes" style="margin-top:6px"></div></div><div class="big" id="ascore"></div></div>
    <div class="fig" id="aradar" style="height:280px"><svg role="img" aria-label="设计结果与目标味道"></svg></div>
    <div class="legend"><span><i style="background:var(--red2)"></i>设计结果</span><span><i style="background:var(--tgt);height:0;border-top:2px dashed var(--tgt)"></i>理想味型</span></div>
