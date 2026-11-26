@@ -178,11 +178,31 @@ body:not([data-mode=remix]) .top{padding-bottom:6px}
 .sgridx{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);grid-template-areas:"top shelf" "more taste" "more aroma";gap:16px 22px;align-items:start}
 .sa-top{grid-area:top}.sa-more{grid-area:more}.sa-shelf{grid-area:shelf}.sa-taste{grid-area:taste}.sa-aroma{grid-area:aroma}
 @media(max-width:900px){.sgridx{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "shelf" "taste" "aroma" "more"}}
+
+.libbtn{background:#fff!important;color:var(--red)!important;font-weight:700;border-color:#fff!important}
+.pgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+@media(max-width:760px){.pgrid{grid-template-columns:minmax(0,1fr)}}
+.prow{display:grid;grid-template-columns:48px minmax(0,1fr);align-items:center;gap:8px;margin:4px 0}
+.prow .seg{display:flex;width:100%}.prow .seg button{flex:1;min-height:38px;padding:4px 2px;font-size:14px}
+.prow .seg button[aria-pressed=true]{background:var(--red2);color:#fff}
+.chips2{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1.5px solid var(--line);background:var(--bg);border-radius:18px;padding:6px 12px;min-height:38px;font-size:14px}
+.chip[aria-pressed=true]{background:var(--soy);color:var(--bg);border-color:var(--soy)}
+#pmiss .chip[aria-pressed=true]{background:var(--bad);border-color:var(--bad);color:#fff;text-decoration:line-through}
+.lpick{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.lpick button span{-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+.lpick button .lc{color:var(--soy);font-weight:500}
+.lpick button:disabled{opacity:.45}
+#orig summary{font-weight:700;min-height:40px}#orig ol{padding-left:20px}#orig li{margin:4px 0}
+.ctab{width:100%;font-size:15px}.ctab td{padding:5px 4px}.csteps{padding-left:22px;font-size:16px;line-height:1.7}.csteps li{margin:4px 0}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.bcard{background:var(--bg);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px;border:1.5px solid var(--line)}
+.modal>.mh,.modal>.cats,.modal>p{flex:none}.pick{align-content:start;grid-auto-rows:min-content}
 </style></head><body>
 <header class="top">
  <h1>锅气 · 中餐调味模拟器</h1>
  <p id="sub">选一道经典菜作底，改调料的种类、用量、下锅顺序和火候，看锅温、出水、焦化怎样一步步改变最终味道。</p>
- <nav class="modes" aria-label="模式"><a href="#remix">改经典菜</a><a href="#stove">从零下厨</a><a href="#spice">调香料</a></nav>
+ <nav class="modes" aria-label="模式"><a href="#remix">菜谱工坊</a><a href="#stove">从零下厨</a><a href="#spice">调香料</a><a href="#book">我的菜谱</a></nav>
  <nav class="dishes" id="dishes" aria-label="经典菜"></nav>
 </header>
 <main class="wrap view" id="v-remix">
@@ -202,14 +222,23 @@ body:not([data-mode=remix]) .top{padding-bottom:6px}
     <label>吃法 <select id="eat"><option value="all">连汁一起吃</option><option value="drain">只吃料（汤汁不喝）</option></select></label>
    </div>
    <div class="bar">
-    <button class="btn pri" data-new="add">＋ 下料</button><button class="btn" data-new="heat">＋ 加热</button><button class="btn" data-new="rest">＋ 静置/腌</button><button class="btn" data-new="pour">＋ 倒入/盛出</button><button class="btn" data-new="drain">＋ 沥油/沥汁</button>
-    <button class="btn" id="undo" title="撤销">↶ 撤销</button><button class="btn" id="reset">还原标准做法</button><button class="btn" id="clear">空锅</button>
+    <button class="btn pri" data-new="add">＋ 下料</button><button class="btn" data-new="heat">＋ 加热</button><button class="btn" data-new="rest">＋ 静置/腌</button><button class="btn" data-new="pour">＋ 倒入/盛出</button><button class="btn" data-new="drain">＋ 沥油/沥汁</button><button class="btn" data-new="remove">＋ 捞出</button>
+    <button class="btn" id="wcard">菜谱卡</button><button class="btn" id="undo" title="撤销">↶ 撤销</button><button class="btn" id="reset">还原标准做法</button><button class="btn" id="clear">空锅</button>
    </div>
    <p class="note" id="insHint"></p>
+   <details id="orig" class="card" hidden style="margin:0 0 10px"><summary id="origsum">原文配方</summary><div id="origbody" style="font-size:15px"></div></details>
    <ol class="steps" id="steps"></ol>
    <div class="mine"><input id="saveName" placeholder="给你的版本起个名" style="border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--card);font-size:16px"><button class="btn" id="save">保存到本机</button><span id="mineList" class="tags"></span></div>
   </section>
  </div>
+ <section class="card" id="improve" style="margin-top:22px"><h2>按口味改良</h2><p class="note" style="margin:0 0 8px">说出你想要的口味，程序会改用量、换料、调顺序和火候，逐条告诉你改了什么。改完先预览，满意再采用。</p>
+  <div class="pgrid"><div><h3 style="margin-top:0">味道</h3><div id="pdims"></div></div>
+   <div><h3 style="margin-top:0">口感</h3><div id="ptex"></div><h3>限制</h3><div class="chips2" id="pcons"></div><h3>家里没有</h3><div class="chips2" id="pmiss"></div></div></div>
+  <div class="fl" style="margin-top:12px"><button class="btn pri" id="prun">生成改良版</button><button class="btn" id="preset">口味归零</button><span class="note" id="pstat"></span></div>
+  <div id="pres" hidden style="margin-top:14px"><div class="pgrid"><div><div class="fig" id="pradar" style="height:280px"><svg role="img" aria-label="改良前后对比"></svg></div><div class="legend"><span><i style="background:var(--red2)"></i>改良后</span><span><i style="background:var(--tgt);height:0;border-top:2px dashed var(--tgt)"></i>改良前</span></div></div>
+   <div><div class="tags" id="pcmp"></div><p class="note" id="ptexr"></p><h3>改了什么</h3><ul class="hint" id="plog"></ul><p class="note" id="pwarn"></p>
+    <div class="fl"><button class="btn pri" id="papply">采用改良版</button><button class="btn" id="pcard">看菜谱卡</button><button class="btn" id="psave">存进我的菜谱</button></div></div></div></div>
+ </section>
  <div class="lower">
   <section class="card"><h2>锅温与汤汁</h2><div class="tfig" id="tchart"><svg role="img" aria-label="锅温随时间变化"></svg><div class="tip" id="tip"></div></div>
    <div class="legend"><span><i style="background:var(--red2)"></i>锅温 °C</span><span><i style="background:var(--soy);opacity:.5;height:8px"></i>锅中水分 g</span><span>竖线 = 第几步</span></div>
@@ -280,4 +309,13 @@ body:not([data-mode=remix]) .top{padding-bottom:6px}
    <div class="fl"><input id="xname" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn pri" id="xsend">加入调料架</button></div><p class="note" id="xsent"></p></section>
  </div>
 </main>
+<main class="wrap view" id="v-book" hidden>
+ <section class="card"><h2>我的菜谱</h2><div class="bgrid" id="blist"></div>
+  <details><summary>导出 / 导入</summary><div class="fl"><button class="btn sm" id="bcopy">复制全部菜谱</button><span class="note" id="bmsg"></span></div><textarea id="bimp" placeholder="把复制的菜谱粘贴到这里"></textarea><button class="btn sm" id="bdoimp">导入</button></details></section>
+</main>
+<div class="mask" id="lib"><div class="modal" role="dialog" aria-label="菜谱库"><div class="mh"><input id="lq" placeholder="搜菜名或食材：锅包肉、茄子、羊肉…"><button class="btn" id="lclose">关闭</button></div><div class="cats" id="lchefs"></div><p class="note" id="lstat" style="margin:0 16px"></p><p class="note" id="lcount" style="margin:0 16px 6px"></p><div class="pick lpick" id="llist"></div></div></div>
+<div class="mask" id="cardm"><div class="modal" role="dialog" aria-label="菜谱卡" style="max-width:720px"><div class="mh"><input id="cname" aria-label="菜名"><button class="btn" id="cclose">关闭</button></div>
+ <div style="overflow-y:auto;padding:0 16px 16px"><p class="note" id="csum" style="white-space:pre-line;margin:0 0 8px"></p>
+  <div class="fl"><label class="unit"><span id="cmainl"></span> <input id="cmain" type="number" min="1" step="50" style="width:90px;border:1px solid var(--line);border-radius:8px;padding:6px;min-height:40px;background:var(--card);font-size:16px;text-align:right"> g</label><button class="btn sm" id="ccopy">复制文字</button><button class="btn sm pri" id="csave">存进我的菜谱</button><span class="note" id="cmsg"></span></div>
+  <div id="cing"></div><h3>做法</h3><ol id="csteps" class="csteps"></ol><textarea id="ctext" hidden></textarea></div></div></div>
 <div class="mask" id="mask"><div class="modal" role="dialog" aria-label="选择食材或调料"><div class="mh"><input id="q" placeholder="搜索：蒜、花椒、五花…"><button class="btn" id="mclose">关闭</button></div><div class="cats" id="mcats"></div><div class="pick" id="mpick"></div></div></div>

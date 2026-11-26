@@ -91,6 +91,36 @@ S('xyou','香油','油',{oil:1,raw:{roast:.3,rich:.02},rawT:90,rawK:.012,def:3,n
 S('dian','淀粉','其他',{starch:1,def:5,note:'上浆护嫩；水淀粉勾芡挂汁'});
 S('jdq','蛋清','其他',{liq:.5,wat:.88,starch:.4,tas:{umami:.01},def:15});
 S('xs','小苏打','其他',{tas:{bitter:.1},soda:1,def:1,note:'嫩肉，多了发涩'});
+S('zhj','柱候酱','咸鲜',{wat:.4,tas:{salt:.1,ferment:.3,sweet:.1,umami:.1},aroO:{ferment:.25,roast:.05},rOil:.015,win:[100,150],rWater:.002,burnT:165,bBit:.3,col:{brown:.3},def:20,note:'粤式焖牛腩的灵魂酱'});
+S('hsj','花生酱','咸鲜',{wat:.02,tas:{rich:.35,roast:.18,sweet:.05},burnT:170,def:15});
+S('hxj','海鲜酱','咸鲜',{wat:.4,tas:{sweet:.25,salt:.08,ferment:.2,umami:.1},burnT:160,col:{brown:.3},def:15});
+S('csj','叉烧酱','咸鲜',{wat:.35,tas:{sweet:.3,salt:.08,ferment:.1,roast:.05},sugar:.3,burnT:160,col:{red:.6},def:30});
+S('zyc','蒸鱼豉油','咸鲜',{liq:1,wat:.7,tas:{salt:.12,umami:.18,sweet:.05,ferment:.06},col:{brown:.15},def:20});
+S('lxl','辣鲜露/鲜味汁','咸鲜',{liq:1,wat:.7,tas:{salt:.1,umami:.3,spicy:.02},def:8});
+S('frz','腐乳汁','咸鲜',{liq:1,wat:.8,tas:{salt:.07,ferment:.2,umami:.1},col:{red:.3},def:15});
+S('hslj','韩式辣酱','咸鲜',{wat:.4,tas:{sweet:.2,spicy:.15,ferment:.15,salt:.08},col:{red:.8},def:20});
+S('hgdl','火锅底料','咸鲜',{oil:1,tas:{spicy:.25,numb:.25,salt:.1,ferment:.1,rich:.1},aroO:{spice:.4,roast:.1},rOil:.02,win:[90,150],rWater:.003,burnT:170,col:{red:1},def:50,note:'含大量牛油和盐'});
+S('nrf','牛肉粉','咸鲜',{tas:{umami:1,salt:.4},msg:1,def:3});
+S('xp','海米/虾皮','咸鲜',{tas:{salt:.08,umami:.35,off:.02},aroO:{roast:.1,wok:.05},rOil:.02,win:[100,160],rWater:.003,def:15});
+S('jy','椒盐','咸鲜',{tas:{salt:.5,numb:.3,spice:.1,umami:.2},def:3});
+S('tangse','糖色','甜',{liq:.4,wat:.4,tas:{sweet:.12,roast:.3,bitter:.02},col:{brown:1.5},def:15,note:'提前炒好的焦糖水'});
+S('mc','米醋(9度)','酸',{liq:1,wat:.88,tas:{sour:.3,ferment:.02},tv:.001,tvd:['sour'],acid:1,def:15});
+S('ml','味淋','酒',{liq:1,wat:.5,alc:.1,tas:{sweet:.2,umami:.03},def:15});
+S('qj','清酒','酒',{liq:1,wat:.82,alc:.15,tas:{umami:.03,sweet:.02},def:15});
+S('cjs','葱姜水','辛香',{water:1,wat:1,raw:{pungent:.02,fresh:.01},def:50,note:'去腥，馅料常用'});
+S('hjs','花椒水','麻',{water:1,wat:1,tas:{numb:.08},def:50});
+S('hy2','黄油','油',{oil:1,tas:{rich:.2,sweet:.02},aroO:{wok:.08,roast:.05},rOil:.02,win:[100,170],burnT:175,bBit:.2,def:20});
+S('ny','牛油','油',{oil:1,tas:{rich:.2},aroO:{wok:.04},rOil:.01,win:[100,220],def:30});
+S('jyou','鸡油','油',{oil:1,tas:{rich:.15,umami:.02},aroO:{wok:.04},rOil:.01,win:[100,220],def:15});
+S('cyou','葱油','油',{oil:1,tas:{rich:.03,wok:.3},def:10});
+S('lyou','料油','油',{oil:1,tas:{rich:.03,spice:.12,wok:.06},def:10});
+S('mf','面粉','其他',{starch:.6,def:30});
+S('hqf','红曲粉/栀子','其他',{col:{red:1},def:1,note:'只调色'});
+S('gcao','甘草','香料',{tas:{sweet:.4,spice:.08},whole:1,def:2});
+S('bk','白蔻','香料',{vol:.00015,rOil:.004,win:[100,160],rWater:.0007,burnT:180,bBit:.3,whole:1,aroO:{spice:.9,fresh:.3},aroW:{spice:.9,fresh:.3},ob:.1,okMin:90,def:2});
+S('rdk','肉蔻','香料',{vol:.00015,rOil:.004,win:[100,160],rWater:.0007,burnT:180,bBit:.3,whole:1,aroO:{spice:1.4,sweet:.03},aroW:{spice:1.4},ob:.15,okMin:90,def:1});
+S('lbao','卤料包','香料',{vol:.00015,rOil:.004,win:[100,160],rWater:.0007,burnT:180,bBit:.3,whole:1,aroO:{spice:1.0,numb:.2,sweet:.03},aroW:{spice:1.0,numb:.15},ob:.1,okMin:90,def:15,note:'八角桂皮香叶草果等组合'});
+S('gzqi','枸杞/红枣','甜',{tas:{sweet:.25},def:10});
 const CATS=['咸鲜','甜','酸','辣','麻','辛香','香料','酒','油','其他'];
 
 // 食材：wr 最大失水比例，coll 胶原软化所需分钟，cook 断生分钟(丁大小)
@@ -122,8 +152,28 @@ F('mr','木耳','菌菇',{umami:.003,cook:.8,wr:.05,cut:'丝'});
 F('hlb','胡萝卜','蔬菜',{sweet:.007,cook:1.5,wr:.1,cut:'丝',mustCook:0});
 F('hg','黄瓜','蔬菜',{fresh:.012,sweet:.002,cook:.5,wr:.3,cut:'条',mustCook:0});
 F('ms','粉丝','其他',{cook:1,wr:-.5,cut:'整',mustCook:1});
+F('lb','萝卜','蔬菜',{umami:.002,sweet:.006,cook:4,wr:.3,soft:1,cut:'块',mustCook:0});
+F('baic','白菜/包菜','蔬菜',{umami:.003,sweet:.005,fresh:.004,cook:1.2,wr:.45,leaf:1,cut:'片',mustCook:0});
+F('dy','豆芽','蔬菜',{umami:.002,fresh:.004,cook:.8,wr:.25,cut:'整',mustCook:1});
+F('qc','芹菜/蒜苔','蔬菜',{fresh:.012,cook:1,wr:.2,cut:'段',mustCook:0});
+F('jc2','韭菜','蔬菜',{fresh:.01,spicy:.001,cook:.4,wr:.3,leaf:1,cut:'段',mustCook:0});
+F('xlh','西兰花','蔬菜',{umami:.003,sweet:.003,cook:1.5,wr:.15,cut:'块',mustCook:0});
+F('bcai','菠菜/油菜','蔬菜',{umami:.004,fresh:.006,cook:.4,wr:.5,leaf:1,cut:'整',mustCook:0});
+F('dg','冬瓜/南瓜','蔬菜',{sweet:.004,cook:2.5,wr:.3,soft:1,cut:'块',mustCook:0});
+F('ou','莲藕','蔬菜',{sweet:.004,cook:3,wr:.1,cut:'片',mustCook:0});
+F('jzg','金针菇','菌菇',{umami:.012,cook:1,wr:.35,cut:'整'});
+F('zt','猪蹄/猪皮','肉',{fat:.25,umami:.01,off:.006,cook:6,coll:90,wr:.15,cut:'块'});
+F('jz','鸡爪/鸡架','禽',{fat:.12,umami:.012,off:.005,cook:3,coll:35,wr:.15,cut:'整'});
+F('zg','猪肝/腰花','肉',{fat:.04,umami:.014,off:.012,cook:.8,lean:1,wr:.25,cut:'片'});
+F('fc','肥肠/肚','肉',{fat:.3,umami:.01,off:.02,cook:4,coll:60,wr:.15,cut:'段'});
+F('yy','鱿鱼/墨鱼','水产',{umami:.016,off:.005,cook:.6,lean:1,fish:1,wr:.2,cut:'条'});
+F('mt','面条/年糕','主食',{cook:2,wr:-.3,cut:'整',mustCook:1});
+F('mfan','米饭','主食',{sweet:.002,cook:.5,wr:0,cut:'整',mustCook:0});
+F('huot','火腿/腊肉','肉',{fat:.25,umami:.025,salt:.03,cook:.5,wr:.05,cut:'片',mustCook:0});
+F('gdf','干豆腐/豆皮','豆制品',{umami:.005,off:.001,cook:.8,wr:.05,tofu:1,cut:'丝'});
+F('xhs','西红柿(大块炖)','蔬菜',{umami:.006,sweet:.004,sour:.006,cook:2,wr:.4,soft:1,cut:'块',mustCook:0});
 const CUTS={'末':.25,'丝':.35,'液':.4,'片':.5,'条':.7,'丁':.8,'段':.8,'块':1.6,'整':2.4,'大块':2.8,'整条':3.5};
-const FCATS=['肉','禽','水产','蛋','豆制品','蔬菜','菌菇','其他'];
+const FCATS=['肉','禽','水产','蛋','豆制品','蔬菜','菌菇','主食','其他'];
 
 function clamp(x,a,b){return x<a?a:x>b?b:x}
 function mkC(id,name){return{id,name,items:[],foods:[],T:22,water:0,oil:0,lid:0,isPot:id==='pot',hot:0,maxT:22}}
@@ -227,7 +277,11 @@ function liveRun(L,sec,fire,mode,lid,record){const cs=L.cs;
 function liveApply(L,s,record){const cs=L.cs;
   if(record){L.marks.push({t:L.t,i:L.steps.length});L.steps.push(s);L.cur=null}
   if(s.t==='add'){if(!IT[s.id]&&!FD[s.id]){L.errs.push(L.steps.length-1);return}const c=cs[s.c||'pot'];addTo(c,s.id,+s.g||0,s.cut,s.prep);c.maxT=Math.max(c.maxT,c.T);liveRec(L)}
-  else if(s.t==='heat')liveRun(L,Math.round(+s.s||0),+s.f||2,s.m||'wok',s.lid?1:0,false);
+  else if(s.t==='heat'){const sec=Math.round(+s.s||0);
+    if(s.u){const p=cs.pot;let i=0;const done=()=>s.u==='boil'?(p.T>=99.5&&p.water>3):s.u==='temp'?p.T>=(+s.v||160):s.u==='reduce'?p.water<=Math.max(15,.15*foodMass(p)):true;
+      while(i<sec&&!done()){liveRun(L,1,+s.f||2,s.m||'wok',s.lid?1:0,false);i++}s._ran=i}
+    else liveRun(L,sec,+s.f||2,s.m||'wok',s.lid?1:0,false)}
+  else if(s.t==='remove'){const c=cs[s.c||'pot'];c.items=c.items.filter(e=>e.id!==s.id);liveRec(L)}
   else if(s.t==='rest')liveRun(L,Math.round(+s.s||0),0,'wok',s.lid?1:0,false);
   else if(s.t==='pour'){if(s.from!==(s.to||'pot'))moveAll(cs[s.from],cs[s.to||'pot'],s.what||'all');liveRec(L)}
   else if(s.t==='drain'){drainC(cs[s.c||'pot'],s.kind,+s.keep||0);liveRec(L)}}
@@ -264,7 +318,7 @@ function evaluate(sim,final,eat){
     const dn=Math.min(1,f.done);
     addF('umami',.7*g*d.umami*(.4+.6*dn)*(1+.4*Math.min(1,f.brown)),d.name);
     addF('sweet',g*d.sweet*(.6+.4*dn),d.name);addF('sour',g*d.sour*dn,d.name);
-    addF('fresh',g*d.fresh*(1-.7*dn),d.name);addF('spicy',g*d.spicy,d.name);
+    addF('fresh',g*d.fresh*(1-.7*dn),d.name);if(d.salt)addF('salt',g*d.salt,d.name);addF('spicy',g*d.spicy,d.name);
     addF('off',g*d.off*f.off*(dn<.6?1.3:1),d.name);
     addF('rich',g*d.fat*.06*(1-.5*f.fr/(g*d.fat+.01))+(d.coll?g*.006*Math.min(1.5,f.tender):0)+f.oa*.05,d.name);
     addF('roast',g*.025*Math.min(1.3,f.brown),d.name+'(焦化)');
@@ -384,4 +438,4 @@ const FIX={salt:['盐/生抽','少放盐或生抽'],sweet:['糖','糖'],sour:['�
 function compare(D,T){let s=0,w=0;const diffs=[];for(const k in WT){const d=(D[k]||0)-(T[k]||0);s+=WT[k]*d*d;w+=WT[k];if(Math.abs(d)>.8)diffs.push([k,d])}
   const rms=Math.sqrt(s/w);diffs.sort((a,b)=>Math.abs(b[1])*WT[b[0]]-Math.abs(a[1])*WT[a[0]]);return{score:Math.round(clamp(100*(1-rms/4.5),0,100)),diffs:diffs.slice(0,4),rms}}
 
-if(typeof module!=='undefined')module.exports={liveNew,liveRun,liveApply,S,CATS,FCATS,IT,FD,DIMS,NEG,simulate,evaluate,warnings,flavorTypes,detectMethods,compare,CUTS};
+if(typeof module!=='undefined')module.exports={texture,foodMass,liveNew,liveRun,liveApply,S,CATS,FCATS,IT,FD,DIMS,NEG,simulate,evaluate,warnings,flavorTypes,detectMethods,compare,CUTS};

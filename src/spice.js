@@ -180,7 +180,7 @@ function potAroma(c){
       for(const k in contrib)N[k]+=contrib[k];
       const p=per[sid]||(per[sid]={});for(const k in contrib)p[k]=(p[k]||0)+contrib[k];
       if(sp.col)col[sp.col]+=g*eff}}
-  if(!used.length)return null;
+  if(!used.length||!c.items.some(e=>spxOf(e.id)&&!['jiang','hs','zm'].includes(e.id)&&e.g>=.3))return null;
   const info=decorate(finishNotes(N,per,burnMax,col));
   const near=matchBlends(info).slice(0,3);const b0=near[0].b;const per1=Object.values(b0.it).reduce((a,v)=>a+v,0);
   return{info,near,kg,mf,totalG,heated,used,supportKg:totalG/per1}}

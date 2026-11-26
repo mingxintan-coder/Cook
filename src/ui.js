@@ -4,13 +4,13 @@ const CN={pot:'锅',A:'A 碗',B:'B 碗',C:'C 盘'};
 const nameOf=id=>(IT[id]||FD[id]||{name:'?'}).name;
 let st={dish:DISHES[0].id,steps:[],fin:'pot',eat:'all',custom:null};let sel=-1;const undo=[];let last=null;
 
-function loadDish(id,keep){const d=DISHES.find(x=>x.id===id);st={dish:id,steps:JSON.parse(JSON.stringify(d.steps)),fin:d.fin,eat:d.eat,custom:null};sel=-1;if(!keep)undo.length=0;full()}
-function target(){return dishTarget(DISHES.find(x=>x.id===st.dish))}
+function loadDish(id,keep){const d=recipeById(id);if(!d)return;st={dish:id,steps:JSON.parse(JSON.stringify(d.steps)),fin:d.fin,eat:d.eat,custom:null};sel=-1;if(!keep)undo.length=0;full()}
+function target(){return dishTarget(recipeById(st.dish))}
 function push(){undo.push(JSON.stringify(st));if(undo.length>60)undo.shift();$('undo').disabled=false}
 
 // 菜单
-function renderDishes(){$('dishes').innerHTML=DISHES.map(d=>`<button data-d="${d.id}" aria-pressed="${st.dish===d.id&&!st.custom}">${d.name}<small>${d.cz}</small></button>`).join('')}
-$('dishes').onclick=e=>{const b=e.target.closest('button');if(b){loadDish(b.dataset.d)}};
+function renderDishes(){$('dishes').innerHTML=`<button data-lib="1" class="libbtn">菜谱库 · 村驴 隋坡等 1000+ 道</button>`+DISHES.map(d=>`<button data-d="${d.id}" aria-pressed="${st.dish===d.id&&!st.custom}">${d.name}<small>${d.cz}</small></button>`).join('')}
+$('dishes').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.lib){openLib();return}loadDish(b.dataset.d)};
 
 // 步骤
 function stepHTML(s,i){
@@ -21,9 +21,10 @@ function stepHTML(s,i){
     body=`<span class="unit">往</span>${cSel('c',s.c||'pot')}<span class="unit">下</span><button class="nm" data-pick="1">${esc(nameOf(s.id))}</button><input type="number" inputmode="decimal" min="0" step="${s.g<5?.5:5}" value="${s.g}" data-k="g" aria-label="用量"><span class="unit">g</span>`;
     if(f){body+=`<select data-k="cut">${Object.keys(CUTS).map(c=>`<option${c===(s.cut||f.cut)?' selected':''}>${c}</option>`).join('')}</select><select data-k="prep"><option value=""${!s.prep?' selected':''}>直接用</option><option value="blanch"${s.prep==='blanch'?' selected':''}>先焯水</option><option value="preboil"${s.prep==='preboil'?' selected':''}>先煮熟</option></select>`}
     if(d&&d.note)body+=`<span class="note sn">${esc(d.note)}</span>`}
-  else if(s.t==='heat'){body=`<span class="unit">锅</span><span class="seg" data-k="f">${[1,2,3].map(f=>`<button data-v="${f}" aria-pressed="${+s.f===f}">${['','小火','中火','大火'][f]}</button>`).join('')}</span><input type="number" min="1" step="5" value="${s.s}" data-k="s" aria-label="秒"><span class="unit">秒 · ${fmtT(s.s)}</span><select data-k="m"><option value="wok"${(s.m||'wok')==='wok'?' selected':''}>锅中</option><option value="steam"${s.m==='steam'?' selected':''}>隔水蒸</option><option value="bake"${s.m==='bake'?' selected':''}>烤</option></select><label><input type="checkbox" data-k="lid"${s.lid?' checked':''}>盖盖</label>`}
+  else if(s.t==='heat'){body=`<span class="unit">锅</span><span class="seg" data-k="f">${[1,2,3].map(f=>`<button data-v="${f}" aria-pressed="${+s.f===f}">${['','小火','中火','大火'][f]}</button>`).join('')}</span><select data-k="u" aria-label="停止条件"><option value=""${!s.u?' selected':''}>定时</option><option value="boil"${s.u==='boil'?' selected':''}>烧开为止</option><option value="temp"${s.u==='temp'?' selected':''}>油温到</option><option value="reduce"${s.u==='reduce'?' selected':''}>收汁到浓</option></select>${s.u==='temp'?`<input type="number" min="80" max="260" step="5" value="${s.v||160}" data-k="v" aria-label="目标温度"><span class="unit">°C</span>`:''}<input type="number" min="1" step="5" value="${s.s}" data-k="s" aria-label="秒"><span class="unit">${s.u?'秒以内':'秒'} · ${fmtT(s.s)}</span><select data-k="m"><option value="wok"${(s.m||'wok')==='wok'?' selected':''}>锅中</option><option value="steam"${s.m==='steam'?' selected':''}>隔水蒸</option><option value="bake"${s.m==='bake'?' selected':''}>烤</option></select><label><input type="checkbox" data-k="lid"${s.lid?' checked':''}>盖盖</label>`}
   else if(s.t==='rest'){body=`<span class="unit">关火静置/腌制</span><input type="number" min="1" step="30" value="${s.s}" data-k="s"><span class="unit">秒 · ${fmtT(s.s)}</span><label><input type="checkbox" data-k="lid"${s.lid?' checked':''}>盖盖</label>`}
   else if(s.t==='pour'){body=`<span class="unit">把</span>${cSel('from',s.from)}<span class="unit">的</span><select data-k="what"><option value="all"${s.what!=='foods'?' selected':''}>全部</option><option value="foods"${s.what==='foods'?' selected':''}>食材(盛出，汁留下)</option></select><span class="unit">倒进</span>${cSel('to',s.to||'pot')}`}
+  else if(s.t==='remove'){const L=Object.values(IT).filter(d=>d.whole||['cong','jiang','suan','gla','hj'].includes(d.id));body=`<span class="unit">从</span>${cSel('c',s.c||'pot')}<span class="unit">捞出</span><select data-k="id">${L.map(d=>`<option value="${d.id}"${d.id===s.id?' selected':''}>${esc(d.name)}</option>`).join('')}</select>`}
   else if(s.t==='drain'){body=`${cSel('c',s.c||'pot')}<select data-k="kind"><option value="oil"${s.kind!=='water'?' selected':''}>沥油</option><option value="water"${s.kind==='water'?' selected':''}>倒掉汤汁</option></select><span class="unit">只留</span><input type="number" min="0" step="5" value="${s.keep}" data-k="keep"><span class="unit">g</span>`}
   return `<li class="st k-${s.t}${i===sel?' sel':''}" data-i="${i}"><button class="when" data-op="sel" style="border:0;background:none" aria-label="在此后插入"><b>${i+1}</b><span class="tm"></span></button><div class="fl">${body}</div>${ops}</li>`}
 function renderSteps(){$('steps').innerHTML=st.steps.length?st.steps.map(stepHTML).join(''):'<li class="note" style="padding:14px">锅是空的。点“＋ 下料”开始，比如先倒油、再加热。</li>';
@@ -45,20 +46,21 @@ let pendingPush=false;
 const onEdit=(e,final)=>{const el=e.target;if(!el.dataset.k)return;const li=el.closest('.st');const s=st.steps[+li.dataset.i];
   if(pendingPush){push();pendingPush=false}
   const k=el.dataset.k;let v=el.type==='checkbox'?(el.checked?1:0):el.value;
-  if(['g','s','keep'].includes(k))v=Math.max(0,+v||0);
+  if(['g','s','keep','v'].includes(k))v=Math.max(0,+v||0);
+  if(k==='u'&&!v){delete s.u;delete s.v;full();return}
   if(k==='prep'&&!v)delete s.prep;else s[k]=v;
   if(final&&(el.tagName==='SELECT'||el.type==='checkbox'))full();else{schedule();if(k==='s'){const u=el.nextElementSibling;if(u)u.textContent='秒 · '+fmtT(v)}}};
 $('steps').addEventListener('input',e=>onEdit(e,false));
 $('steps').addEventListener('change',e=>{onEdit(e,true);pendingPush=true});
 
 function newStep(t){let s;
-  if(t==='heat')s={t,f:2,s:60};else if(t==='rest')s={t,s:300};else if(t==='pour')s={t,from:'A',to:'pot',what:'all'};else if(t==='drain')s={t,c:'pot',kind:'oil',keep:30};
+  if(t==='heat')s={t,f:2,s:60};else if(t==='remove')s={t,c:'pot',id:'xy'};else if(t==='rest')s={t,s:300};else if(t==='pour')s={t,from:'A',to:'pot',what:'all'};else if(t==='drain')s={t,c:'pot',kind:'oil',keep:30};
   if(t==='add'){openPick(-1);return}
   push();insert(s);full()}
 function insert(s){if(sel>=0){st.steps.splice(sel+1,0,s);sel++}else st.steps.push(s)}
 document.querySelector('.bar').addEventListener('click',e=>{const b=e.target.closest('[data-new]');if(b)newStep(b.dataset.new)});
 $('undo').onclick=()=>{if(!undo.length)return;st=JSON.parse(undo.pop());full();$('undo').disabled=!undo.length};
-$('reset').onclick=()=>{const d=DISHES.find(x=>x.id===st.dish)||DISHES[0];push();loadDish(d.id,1)};
+$('reset').onclick=()=>{const d=recipeById(st.dish)||DISHES[0];push();loadDish(d.id,1)};
 $('clear').onclick=()=>{push();st.steps=[];st.fin='pot';st.eat='all';sel=-1;full()};
 $('fin').onchange=e=>{push();st.fin=e.target.value;compute()};$('eat').onchange=e=>{push();st.eat=e.target.value;compute()};
 
@@ -83,8 +85,8 @@ $('mpick').onclick=e=>{const b=e.target.closest('button[data-id]');if(!b)return;
 
 // 计算与绘制
 let timer=0;function schedule(){clearTimeout(timer);timer=setTimeout(compute,120)}
-function full(){renderDishes();renderSteps();const d=DISHES.find(x=>x.id===st.dish);
-  $('dname').textContent=(st.custom||(d?d.name:'自由调配'))+' · 步骤';$('ddesc').textContent=d?d.desc:'';
+function full(){renderDishes();renderSteps();const d=recipeById(st.dish);
+  $('dname').textContent=(st.custom||(d?d.name:'自由调配'))+' · 步骤';$('ddesc').textContent=d?(d.desc||''):'';if(window.origPanel)window.origPanel(d);
   $('fin').value=st.fin;$('eat').value=st.eat;$('undo').disabled=!undo.length;compute()}
 function paintTimes(){if(!last)return;const {sim}=last;document.querySelectorAll('#steps .st').forEach((li,i)=>{const m=sim.marks[i];const p=sim.potLog[Math.max(0,m.t-1)];li.querySelector('.tm').textContent=clock(m.t)+(m.t>0&&p?` ${Math.round(p.T)}°`:'')})}
 function level(k,v){if(k==='salt')return v<1?'无':v<2.5?'淡':v<4?'偏淡':v<6.6?'适中':v<8?'偏咸':'齁咸';
@@ -119,7 +121,7 @@ function compute(){
   // 提醒
   const good=[];if(!W.some(w=>w[0]>=1))good.push([-1,'火候和调味没有明显问题。']);
   $('warns').innerHTML=W.concat(good).sort((a,b)=>b[0]-a[0]).map(w=>`<li class="${w[0]<0?'ok':'l'+w[0]}">${esc(w[1])}</li>`).join('');
-  aromaPanel($('raroma'),ev.c);
+  aromaPanel($('raroma'),ev.c);if(window.impRender)window.impRender();
   paintTimes();
   try{localStorage.setItem('tw.last',JSON.stringify(st))}catch(e){}
 }
@@ -165,9 +167,10 @@ $('doImp').onclick=()=>{try{const o=JSON.parse($('imp').value);if(!Array.isArray
 $('raroma').innerHTML=AROMA_HTML;
 // 供其他模式调用
 window.openInEditor=(o)=>{push();st=o;sel=-1;full()};
+window.wsGet=()=>st;window.wsSet=(steps,label)=>{push();st.steps=steps;if(label)st.custom=label;sel=-1;full()};window.wsLoad=(id)=>loadDish(id);window.wsTarget=()=>target();
 window.remixRefresh=()=>{paintRadar();paintTemp();const b=$('raroma');if(b._draw)b._draw()};
 // 启动
 let init=null;try{init=JSON.parse(localStorage.getItem('tw.last')||'null')}catch(e){}
-if(init&&Array.isArray(init.steps)&&init.steps.every(s=>s.t!=='add'||IT[s.id]||FD[s.id])){st=init;full()}else loadDish(DISHES[0].id);
+if(init&&Array.isArray(init.steps)&&init.steps.every(s=>s.t!=='add'||IT[s.id]||FD[s.id])){st=init;full();if(String(init.dish).startsWith('m:'))loadLibrary().then(()=>full())}else loadDish(DISHES[0].id);
 renderMine();
 }
