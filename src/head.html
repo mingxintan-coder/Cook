@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>锅气 · 中餐调味模拟器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: 后厨师傅的口吻，直接、讲火候
+   IDEA: 一张贴在灶台边的配菜单 + 锅里的温度计
+   PICTURE: 味道雷达（当前 vs 标准）与锅温曲线，随每一步实时变化
+   COLOUR and TYPE: 白底，辣椒红满版页头，酱油褐辅助，葱绿表示到位；Noto Serif SC 标题 + Noto Sans SC 正文
+   LAYOUT: 页头选菜 → 结果(雷达+判定) 与 步骤表并排 → 锅温曲线 → 口感/提示/来源；600px 以下单列 */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#14100e);--card:light-dark(#f6f3f1,#1f1916);--line:light-dark(#e4dcd6,#3a2f29);--ink:light-dark(#1d1512,#f2ebe6);--mute:light-dark(#6f625a,#b0a299);--red:#b8231a;--red2:light-dark(#b8231a,#ef5a43);--soy:light-dark(#4a2f1f,#d8a77f);--ok:light-dark(#2d7a4c,#6fcf97);--warn:light-dark(#a86400,#f0b14a);--bad:light-dark(#b8231a,#ff7a66);--tgt:light-dark(#1d1512,#f2ebe6)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans SC",system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:"Noto Serif SC",serif;margin:0;line-height:1.1;text-wrap:balance}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--warn);outline-offset:2px}
+.top{background:var(--red);color:#fff;padding:22px max(4vw,16px) 0}
+.top h1{font-size:clamp(30px,4.4vw,46px);font-weight:900}
+.top p{margin:6px 0 14px;max-width:70ch;opacity:.92}
+.dishes{display:flex;gap:8px;overflow-x:auto;padding-bottom:16px;scroll-snap-type:x proximity}
+.dishes button{flex:none;scroll-snap-align:start;border:1.5px solid rgba(255,255,255,.55);background:transparent;color:#fff;border-radius:22px;padding:9px 15px;min-height:44px;white-space:nowrap}
+.dishes button small{opacity:.75;margin-left:4px;font-size:13px}
+.dishes button[aria-pressed=true]{background:#fff;color:var(--red);border-color:#fff;font-weight:700}
+.wrap{max-width:1320px;margin:0 auto;padding:18px max(3vw,14px) 60px}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:22px;align-items:start}
+@media(max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--card);border-radius:14px;padding:16px}
+.desc{color:var(--mute);margin:0 0 12px}
+.res{position:sticky;top:10px}
+@media(max-width:900px){.res{position:static}}
+.score{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.big{font:900 clamp(40px,6vw,56px)/1 "Noto Serif SC",serif;color:var(--red2)}
+.big small{font-size:18px;color:var(--mute);font-weight:600}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{border-radius:6px;padding:3px 9px;font-size:14px;background:var(--bg);border:1px solid var(--line)}
+.tag.main{background:var(--soy);color:var(--bg);border-color:var(--soy);font-weight:700}
+.fig{position:relative;height:340px;margin:4px 0}
+.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--mute);flex-wrap:wrap}
+.legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:5px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.facts div{background:var(--bg);border-radius:10px;padding:8px 10px;font-size:14px}
+.facts b{display:block;font-size:13px;color:var(--mute);font-weight:500}
+.sw{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:1px solid var(--line)}
+@media(max-width:600px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.hint{font-size:14px;margin:10px 0 0;padding-left:18px}
+.hint li{margin:3px 0}
+/* steps */
+.bar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+.btn{border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 12px;min-height:44px}
+.btn.pri{background:var(--red);color:#fff;border-color:var(--red)}
+.btn.sm{min-height:36px;padding:4px 10px;font-size:14px}
+.btn:disabled{opacity:.4;cursor:default}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.st{background:var(--bg);border:1.5px solid var(--line);border-radius:12px;padding:8px 10px;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:8px;align-items:center}
+.st.sel{border-color:var(--red2)}
+.st.k-heat{border-left:5px solid var(--red2)}.st.k-rest{border-left:5px solid var(--mute)}.st.k-pour,.st.k-drain{border-left:5px solid var(--soy)}.st.k-add{border-left:5px solid var(--ok)}
+.when{font-size:12px;color:var(--mute);line-height:1.25;text-align:center;font-variant-numeric:tabular-nums}
+.when b{display:block;font-size:15px;color:var(--ink)}
+.fl{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fl select,.fl input{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 6px;min-height:38px;font-size:16px}
+.fl input[type=number]{width:78px;text-align:right}
+.fl .nm{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 10px;min-height:38px;font-weight:700}
+.fl label{font-size:14px;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--card);padding:6px 10px;min-height:38px}
+.seg button[aria-pressed=true]{background:var(--red2);color:#fff}
+.ops{display:flex;gap:2px}
+.ops button{border:0;background:none;width:34px;height:38px;border-radius:8px;color:var(--mute);font-size:16px}
+.ops button:hover{background:var(--card);color:var(--ink)}
+.unit{font-size:14px;color:var(--mute)}
+.st .sn{display:none;flex-basis:100%}.st.sel .sn{display:block}
+@media(max-width:600px){.st{grid-template-columns:38px minmax(0,1fr);padding:6px 8px}.ops{grid-column:1/-1;justify-content:flex-end}.st:not(.sel) .ops{display:none}}
+/* lower */
+.lower{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;margin-top:22px}
+@media(max-width:900px){.lower{grid-template-columns:minmax(0,1fr)}}
+.tfig{position:relative;height:240px}.tfig>svg{position:absolute;inset:0;width:100%;height:100%}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;padding:4px 8px;border-radius:6px;white-space:nowrap;display:none}
+.rows{display:flex;flex-direction:column;gap:2px}
+.row{display:grid;grid-template-columns:56px minmax(0,1fr) 44px 64px;gap:8px;align-items:center;padding:5px 4px;border-radius:8px;border:0;background:none;text-align:left;width:100%}
+.row:hover{background:var(--bg)}
+.row .tr{position:relative;height:12px;background:var(--bg);border-radius:6px}
+.row .fill{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--red2)}
+.row .tk{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--tgt);border-radius:2px}
+.row .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.row .d{font-size:13px;color:var(--mute);white-space:nowrap}
+.srcs{font-size:13px;color:var(--mute);padding:0 6px 8px 66px}
+.neg .fill{background:var(--warn)}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}
+th{font-size:13px;color:var(--mute);font-weight:500}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.warns{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.warns li{padding:8px 10px 8px 12px;border-radius:8px;background:var(--bg);border-left:4px solid var(--mute);font-size:15px}
+.warns li.l1{border-color:var(--warn)}.warns li.l2{border-color:var(--bad)}.warns li.ok{border-color:var(--ok)}
+h2{font-size:22px;margin-bottom:8px}
+h3{font-size:17px;margin:14px 0 6px}
+/* modal */
+.mask{position:fixed;inset:0;background:rgba(20,12,8,.55);display:none;align-items:flex-end;justify-content:center;z-index:9}
+.mask.on{display:flex}
+.modal{background:var(--bg);width:min(760px,100%);max-height:86vh;border-radius:16px 16px 0 0;display:flex;flex-direction:column}
+@media(min-width:700px){.mask{align-items:center}.modal{border-radius:16px}}
+.mh{padding:14px 16px 8px;display:flex;gap:8px;align-items:center}
+.mh input{flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;min-height:44px;background:var(--card);font-size:16px}
+.cats{display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px}
+.cats button{flex:none;border:1px solid var(--line);background:var(--card);border-radius:18px;padding:6px 12px;min-height:38px}
+.cats button[aria-pressed=true]{background:var(--soy);color:var(--bg);border-color:var(--soy)}
+.pick{overflow-y:auto;padding:0 16px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.pick button{text-align:left;border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:8px 10px;min-height:44px}
+.pick button b{display:block}
+.pick button span{font-size:13px;color:var(--mute);line-height:1.35;display:block}
+details{margin-top:22px}summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
+.note{font-size:14px;color:var(--mute)}
+textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:8px;font:14px/1.4 ui-monospace,monospace;color:var(--ink)}
+.mine{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+@media(prefers-reduced-motion:no-preference){.st{transition:border-color .15s}.row .fill{transition:width .25s}}
+
+.modes{display:flex;gap:4px;margin:0 0 14px;flex-wrap:wrap}
+.modes a{color:#fff;text-decoration:none;padding:9px 16px;border-radius:10px 10px 0 0;min-height:44px;display:flex;align-items:center;font-weight:700;border-bottom:3px solid transparent;opacity:.8}
+.modes a[aria-current=page]{opacity:1;border-bottom-color:#fff;background:rgba(255,255,255,.12)}
+body:not([data-mode=remix]) #dishes{display:none}
+body:not([data-mode=remix]) .top{padding-bottom:6px}
+.view[hidden]{display:none}
+.stove{display:grid;grid-template-columns:minmax(0,1fr) 64px;gap:12px;align-items:stretch}
+.wokfig{position:relative;height:300px;background:light-dark(#efe9e4,#0e0b0a);border-radius:12px;overflow:hidden}
+.wokfig>svg{position:absolute;inset:0;width:100%;height:100%}
+.gauge{position:relative;border-radius:10px;overflow:hidden;background:linear-gradient(to top,#8fb3c9 0%,#8fb3c9 36%,#e9d48a 38%,#f0a43a 42%,#e8452c 62%,#7a1d14 73%,#2b2522 100%)}
+.gauge i{position:absolute;left:-2px;right:-2px;height:4px;background:var(--ink);box-shadow:0 0 0 2px var(--bg);transition:bottom .25s}
+.gauge span{position:absolute;left:4px;font-size:11px;color:#fff;text-shadow:0 1px 2px #000}
+.readout{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0}
+.readout div{background:var(--bg);border-radius:10px;padding:6px 10px;font-size:13px;color:var(--mute)}
+.readout b{display:block;font:700 22px/1.1 "Noto Serif SC",serif;color:var(--ink);font-variant-numeric:tabular-nums}
+@media(max-width:600px){.readout{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+.ctl .seg button{min-height:44px;padding:6px 12px}
+.btn[aria-pressed=true]{background:var(--soy);color:var(--bg);border-color:var(--soy)}
+.clist{list-style:none;margin:0;padding:0;font-size:14px}.clist li{padding:3px 0;border-bottom:1px dashed var(--line)}
+.slog{list-style:none;margin:0;padding:0;font-size:14px;max-height:190px;overflow-y:auto}.slog li{padding:2px 0}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px}
+.chips button{flex:none;border:1px solid var(--line);background:var(--bg);border-radius:18px;padding:6px 12px;min-height:40px}
+.chips button[aria-pressed=true]{background:var(--soy);color:var(--bg);border-color:var(--soy)}
+.sgrid{display:flex;flex-wrap:wrap;gap:6px;max-height:180px;overflow-y:auto;padding:4px 0}
+.sgrid button{border:1.5px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 10px;min-height:40px}
+.sgrid button[aria-pressed=true]{border-color:var(--red2);color:var(--red2);font-weight:700}
+#spick{background:var(--bg);border-radius:10px;padding:10px;margin-top:8px}
+#spick input[type=number]{width:84px;border:1px solid var(--line);border-radius:8px;padding:6px;min-height:40px;background:var(--card);text-align:right;font-size:16px}
+.near{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media(max-width:600px){.near{grid-template-columns:minmax(0,1fr)}}
+.ncard{background:var(--bg);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:2px;border:1.5px solid var(--line)}
+.ncard.first{border-color:var(--red2)}
+.big2{font:900 30px/1 "Noto Serif SC",serif;color:var(--red2)}
+.xlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.xlist li[data-i]{display:grid;grid-template-columns:minmax(90px,130px) minmax(0,1fr) 76px 16px 36px;gap:8px;align-items:center;background:var(--bg);border-radius:10px;padding:6px 8px}
+.xlist .xn{display:flex;flex-direction:column;line-height:1.2}.role{font-size:12px;color:var(--mute)}
+.xlist .xt{grid-column:1/-1;font-size:13px;display:none}.xlist li:focus-within .xt{display:block}
+.xlist input[type=number]{border:1px solid var(--line);border-radius:8px;padding:6px;min-height:38px;background:var(--card);text-align:right;font-size:16px;width:100%}
+.xlist input[type=range]{width:100%;accent-color:var(--soy);min-height:32px}
+.x{border:0;background:none;color:var(--mute);width:36px;height:38px;border-radius:8px}
+@media(max-width:600px){.xlist li[data-i]{grid-template-columns:minmax(0,1fr) 76px 16px 36px}.xlist input[type=range]{grid-column:1/-1;grid-row:2}}
+#xparams{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0}
+#xparams label{display:flex;align-items:center;gap:5px;font-size:15px}
+#xparams select,#xparams input[type=number]{border:1px solid var(--line);border-radius:8px;padding:6px;min-height:40px;background:var(--bg);font-size:16px}
+#xparams input[type=number]{width:76px}
+.xshelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px}
+.xshelf button{text-align:left;border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;min-height:44px}
+.xshelf button span{display:block;font-size:12.5px;color:var(--mute);line-height:1.35}
+.xshelf button[aria-pressed=true]{border-color:var(--soy)}
+.layers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.layers div{background:var(--bg);border-radius:10px;padding:8px 10px;font-size:14px;line-height:1.6}
+.layers b{display:block;font-size:13px;color:var(--mute);font-weight:500}
+.srow{display:grid;grid-template-columns:90px minmax(0,1fr) 44px;gap:8px;align-items:center;font-size:14px;padding:2px 0}
+.srow .tr{height:10px;background:var(--bg);border-radius:5px;position:relative;overflow:hidden}.srow .fill{position:absolute;inset:0 auto 0 0;border-radius:5px}
+.srow .v{text-align:right;font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:no-preference){.flame{animation:fl .35s ease-in-out infinite alternate;transform-origin:center bottom;transform-box:fill-box}@keyframes fl{to{transform:scaleY(.82)}}.steam{animation:st 1.6s ease-in-out infinite alternate}@keyframes st{to{opacity:.1;transform:translateY(-6px)}}}
+.sgridx{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);grid-template-areas:"top shelf" "more taste" "more aroma";gap:16px 22px;align-items:start}
+.sa-top{grid-area:top}.sa-more{grid-area:more}.sa-shelf{grid-area:shelf}.sa-taste{grid-area:taste}.sa-aroma{grid-area:aroma}
+@media(max-width:900px){.sgridx{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "shelf" "taste" "aroma" "more"}}
+</style></head><body>
+<header class="top">
+ <h1>锅气 · 中餐调味模拟器</h1>
+ <p id="sub">选一道经典菜作底，改调料的种类、用量、下锅顺序和火候，看锅温、出水、焦化怎样一步步改变最终味道。</p>
+ <nav class="modes" aria-label="模式"><a href="#remix">改经典菜</a><a href="#stove">从零下厨</a><a href="#spice">调香料</a></nav>
+ <nav class="dishes" id="dishes" aria-label="经典菜"></nav>
+</header>
+<main class="wrap view" id="v-remix">
+ <div class="grid">
+  <section class="card res" aria-label="味道结果">
+   <div class="score"><div class="big" id="score">–</div><div><div class="tags" id="types"></div><div class="note" id="method" style="margin-top:6px"></div></div></div>
+   <div class="fig" id="radar"><svg role="img" aria-label="味道雷达图"></svg></div>
+   <div class="legend"><span><i style="background:var(--red2)"></i>你的调配</span><span id="lgT"><i style="background:var(--tgt);height:0;border-top:2px dashed var(--tgt)"></i>标准做法</span><span>分值 0–10，按人对浓度的对数感知换算</span></div>
+   <div class="facts" id="facts"></div>
+   <ul class="hint" id="hints"></ul>
+  </section>
+  <section aria-label="步骤">
+   <h2 id="dname">步骤</h2>
+   <p class="desc" id="ddesc"></p>
+   <div class="fl" style="margin-bottom:6px">
+    <label>成品在 <select id="fin"><option value="pot">锅</option><option value="A">A 碗</option><option value="B">B 碗</option><option value="C">C 盘</option></select></label>
+    <label>吃法 <select id="eat"><option value="all">连汁一起吃</option><option value="drain">只吃料（汤汁不喝）</option></select></label>
+   </div>
+   <div class="bar">
+    <button class="btn pri" data-new="add">＋ 下料</button><button class="btn" data-new="heat">＋ 加热</button><button class="btn" data-new="rest">＋ 静置/腌</button><button class="btn" data-new="pour">＋ 倒入/盛出</button><button class="btn" data-new="drain">＋ 沥油/沥汁</button>
+    <button class="btn" id="undo" title="撤销">↶ 撤销</button><button class="btn" id="reset">还原标准做法</button><button class="btn" id="clear">空锅</button>
+   </div>
+   <p class="note" id="insHint"></p>
+   <ol class="steps" id="steps"></ol>
+   <div class="mine"><input id="saveName" placeholder="给你的版本起个名" style="border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--card);font-size:16px"><button class="btn" id="save">保存到本机</button><span id="mineList" class="tags"></span></div>
+  </section>
+ </div>
+ <div class="lower">
+  <section class="card"><h2>锅温与汤汁</h2><div class="tfig" id="tchart"><svg role="img" aria-label="锅温随时间变化"></svg><div class="tip" id="tip"></div></div>
+   <div class="legend"><span><i style="background:var(--red2)"></i>锅温 °C</span><span><i style="background:var(--soy);opacity:.5;height:8px"></i>锅中水分 g</span><span>竖线 = 第几步</span></div>
+   <h3>口感与火候</h3><div style="overflow-x:auto"><table id="tex"></table></div>
+  </section>
+  <section class="card"><h2>味道拆解</h2><p class="note" style="margin:0 0 6px">点某一味看它从哪里来。竖线是标准做法的值。</p><div class="rows" id="dims"></div></section>
+ </div>
+ <section class="card" style="margin-top:22px"><h2>师傅提醒</h2><ul class="warns" id="warns"></ul></section>
+ <section class="card" id="raroma" hidden style="margin-top:22px"></section>
+ <details><summary>模拟怎么算的</summary><div class="note" style="max-width:75ch">
+  <p>逐秒推进：锅的热容与火力（小/中/大 ≈ 0.9/1.7/3 kW）决定升温；锅里有水时温度被钉在 100°C，多余热量蒸发水分，加盖蒸发约降到一成；干锅时食材越多、出水越多，锅温越上不去。热锅遇料汁会瞬间汽化降温。</p>
+  <p>每种调料分三部分：稳定呈味（盐、糖、酸、鲜）、受热消散的生鲜气（生蒜辛冲、葱花香菜清香、香油）、需要提取的香（葱姜蒜花椒辣椒豆瓣在各自油温窗口里煸出，香料在水里慢慢煮出）。超过焦化温度会转成糊味和苦味；糖在干锅 150°C 以上焦化，过 190°C 发苦；醋久煮酸味挥发；料酒在 78°C 以上挥发并带走腥味；香叶桂皮久煮出苦。</p>
+  <p>食材有熟度、胶原软化、表面美拉德焦化、出水、出油、吸油（茄子）、入味和腥膻。上浆能护嫩。味道按“调料总量 ÷ 成菜总重”算浓度，再按感知交互修正：甜压酸和苦，咸让鲜显出来，麻放大辣，香料葱姜和辣味掩盖腥膻。</p>
+  <p>数值是对家常经验的近似，用来看趋势和比较，不是精确的化学计算。</p></div></details>
+ <details><summary>导出 / 导入配方</summary><div class="fl"><button class="btn sm" id="copyJ">复制当前配方</button><span class="note" id="copyMsg"></span></div><textarea id="imp" placeholder="把复制的配方粘贴到这里"></textarea><button class="btn sm" id="doImp">导入</button></details>
+</main>
+<main class="wrap view" id="v-stove" hidden>
+ <div class="sgridx">
+  <section class="card sa-top">
+   <div class="stove"><div class="wokfig"><svg id="wok" viewBox="40 30 340 250" preserveAspectRatio="xMidYMid meet" role="img" aria-label="锅"></svg></div>
+    <div class="gauge" aria-label="锅温计"><span style="bottom:36%">100°</span><span style="bottom:58%">150°</span><span style="bottom:73%">190°</span><i id="smark" style="bottom:8%"></i></div></div>
+   <div class="readout"><div>计时<b id="sclock">0:00</b></div><div>锅温 · <span id="szone">温</span><b id="stemp">22°C</b></div><div>锅中水分<b id="swat">0 g</b></div><div>锅中油<b id="soil">0 g</b></div></div>
+   <div class="ctl"><span class="seg" id="sfire"><button data-v="0" aria-pressed="true">关火</button><button data-v="1" aria-pressed="false">小火</button><button data-v="2" aria-pressed="false">中火</button><button data-v="3" aria-pressed="false">大火</button></span>
+    <button class="btn" id="slid" aria-pressed="false">没盖盖</button><select id="smode" class="btn"><option value="wok">锅中加热</option><option value="steam">隔水蒸</option></select></div>
+   <div class="ctl"><button class="btn pri" id="splay" aria-pressed="false">▶ 开始计时</button><span class="seg" id="sspeed"><button data-v="1" aria-pressed="false">1×</button><button data-v="5" aria-pressed="true">5×</button><button data-v="20" aria-pressed="false">20×</button></span>
+    <span class="seg" id="sskip"><button data-s="10">+10秒</button><button data-s="30">+30秒</button><button data-s="60">+1分</button><button data-s="300">+5分</button></span></div>
+   <p class="note" style="margin:0">开火后时间按倍速走；随时暂停下料。也可以停着计时，用“+10秒”等按钮一段段推进。</p>
+  </section>
+  <section class="card sa-more">
+   <h3 style="margin-top:0">锅碗里有什么</h3><div id="scont"></div>
+   <h3>挪动</h3><div class="ctl" id="smove"><button class="btn sm" data-from="A" data-to="pot">A 碗倒入锅</button><button class="btn sm" data-from="B" data-to="pot">B 碗倒入锅</button><button class="btn sm" data-from="pot" data-to="C" data-what="foods">锅中食材盛到 C 盘</button><button class="btn sm" data-from="C" data-to="pot">C 盘倒回锅</button><button class="btn sm" data-from="pot" data-to="C">全部出锅到 C 盘</button>
+    <span class="fl"><button class="btn sm" data-drain="oil">沥油</button><button class="btn sm" data-drain="water">倒汤汁</button><label class="unit">只留 <input id="skeep" type="number" value="20" min="0" step="5" style="width:64px"> g</label></span></div>
+   <h3>记录</h3><ul class="slog" id="slog"></ul>
+  </section>
+   <div class="card sa-shelf"><h2>调料架</h2>
+    <div class="fl" style="margin-bottom:6px"><span class="unit">放进</span><span class="seg" id="sto"><button data-v="pot" aria-pressed="true">锅</button><button data-v="A" aria-pressed="false">A 碗</button><button data-v="B" aria-pressed="false">B 碗</button><button data-v="C" aria-pressed="false">C 盘</button></span>
+     <input id="sq" placeholder="搜索" style="flex:1;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"></div>
+    <div class="chips" id="scats"></div><div class="sgrid" id="sgrid"></div><div id="spick"></div></div>
+   <div class="card sa-taste"><h2>此刻出锅的味道</h2><div class="tags" id="stypes"></div>
+    <div class="fig" id="sradar" style="height:300px"><svg role="img" aria-label="当前味道雷达"></svg></div>
+    <ul class="warns" id="swarn"></ul>
+    <div class="fl" style="margin-top:10px"><label class="unit">吃法 <select id="seat" class="btn"><option value="all">连汁吃</option><option value="drain">只吃料</option></select></label><button class="btn pri" id="sserve">出锅评菜</button><button class="btn" id="sreset">重来</button></div></div>
+  <div class="card sa-aroma" id="saroma" hidden></div>
+ </div>
+ <section class="card" id="sreport" hidden style="margin-top:22px"><h2>出锅评语</h2><div id="srep"></div></section>
+</main>
+<main class="wrap view" id="v-spice" hidden>
+ <div class="grid">
+  <section>
+   <div class="card"><h2>配方</h2><p class="note" style="margin:0 0 6px">从经典香型起步，或清空后自己配。</p>
+    <div class="chips" id="xpre"></div><div id="xparams"></div>
+    <ul class="xlist" id="xlist"></ul>
+    <div class="fl" style="margin-top:8px"><button class="btn sm" id="xclear">清空</button></div>
+    <h3>香料架</h3><div class="chips" id="xcats"></div><div class="xshelf" id="xshelf"></div></div>
+  </section>
+  <section class="card res"><h2>复合香味</h2><p id="xdesc" style="margin:0 0 4px"></p>
+   <div class="fig" id="xradar" style="height:320px"><svg role="img" aria-label="香气轮"></svg></div>
+   <div class="legend"><span><i style="background:var(--soy)"></i>你的配方</span><span><i style="background:var(--tgt);height:0;border-top:2px dashed var(--tgt)"></i>所选经典香型</span></div>
+   <div class="layers" id="xlayers"></div>
+   <h3>谁贡献了香气</h3><div id="xshare"></div>
+   <div id="xcurvebox"><h3>提取曲线</h3><div class="tfig" id="xcurve" style="height:200px"><svg role="img" aria-label="香气与苦涩随时间"></svg></div><p class="note" id="xbest"></p></div>
+  </section>
+ </div>
+ <div class="lower">
+  <section class="card"><h2>最像的经典香型</h2><div class="near" id="xmatch"></div><h3>适合做</h3><div class="tags" id="xdish"></div><ul class="hint" id="xrules"></ul></section>
+  <section class="card"><h2>配料提醒</h2><ul class="warns" id="xwarn"></ul>
+   <h3>放进调料架</h3><p class="note" style="margin:0 0 6px">把这包料变成一种调料，在“改经典菜”和“从零下厨”里使用。</p>
+   <div class="fl"><input id="xname" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn pri" id="xsend">加入调料架</button></div><p class="note" id="xsent"></p></section>
+ </div>
+</main>
+<div class="mask" id="mask"><div class="modal" role="dialog" aria-label="选择食材或调料"><div class="mh"><input id="q" placeholder="搜索：蒜、花椒、五花…"><button class="btn" id="mclose">关闭</button></div><div class="cats" id="mcats"></div><div class="pick" id="mpick"></div></div></div>

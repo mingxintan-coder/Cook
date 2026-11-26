@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>锅气 · 中餐调味模拟器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: 后厨师傅的口吻，直接、讲火候
+   IDEA: 一张贴在灶台边的配菜单 + 锅里的温度计
+   PICTURE: 味道雷达（当前 vs 标准）与锅温曲线，随每一步实时变化
+   COLOUR and TYPE: 白底，辣椒红满版页头，酱油褐辅助，葱绿表示到位；Noto Serif SC 标题 + Noto Sans SC 正文
+   LAYOUT: 页头选菜 → 结果(雷达+判定) 与 步骤表并排 → 锅温曲线 → 口感/提示/来源；600px 以下单列 */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#14100e);--card:light-dark(#f6f3f1,#1f1916);--line:light-dark(#e4dcd6,#3a2f29);--ink:light-dark(#1d1512,#f2ebe6);--mute:light-dark(#6f625a,#b0a299);--red:#b8231a;--red2:light-dark(#b8231a,#ef5a43);--soy:light-dark(#4a2f1f,#d8a77f);--ok:light-dark(#2d7a4c,#6fcf97);--warn:light-dark(#a86400,#f0b14a);--bad:light-dark(#b8231a,#ff7a66);--tgt:light-dark(#1d1512,#f2ebe6)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans SC",system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:"Noto Serif SC",serif;margin:0;line-height:1.1;text-wrap:balance}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--warn);outline-offset:2px}
+.top{background:var(--red);color:#fff;padding:22px max(4vw,16px) 0}
+.top h1{font-size:clamp(30px,4.4vw,46px);font-weight:900}
+.top p{margin:6px 0 14px;max-width:70ch;opacity:.92}
+.dishes{display:flex;gap:8px;overflow-x:auto;padding-bottom:16px;scroll-snap-type:x proximity}
+.dishes button{flex:none;scroll-snap-align:start;border:1.5px solid rgba(255,255,255,.55);background:transparent;color:#fff;border-radius:22px;padding:9px 15px;min-height:44px;white-space:nowrap}
+.dishes button small{opacity:.75;margin-left:4px;font-size:13px}
+.dishes button[aria-pressed=true]{background:#fff;color:var(--red);border-color:#fff;font-weight:700}
+.wrap{max-width:1320px;margin:0 auto;padding:18px max(3vw,14px) 60px}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:22px;align-items:start}
+@media(max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--card);border-radius:14px;padding:16px}
+.desc{color:var(--mute);margin:0 0 12px}
+.res{position:sticky;top:10px}
+@media(max-width:900px){.res{position:static}}
+.score{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.big{font:900 clamp(40px,6vw,56px)/1 "Noto Serif SC",serif;color:var(--red2)}
+.big small{font-size:18px;color:var(--mute);font-weight:600}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{border-radius:6px;padding:3px 9px;font-size:14px;background:var(--bg);border:1px solid var(--line)}
+.tag.main{background:var(--soy);color:var(--bg);border-color:var(--soy);font-weight:700}
+.fig{position:relative;height:340px;margin:4px 0}
+.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--mute);flex-wrap:wrap}
+.legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:5px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.facts div{background:var(--bg);border-radius:10px;padding:8px 10px;font-size:14px}
+.facts b{display:block;font-size:13px;color:var(--mute);font-weight:500}
+.sw{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:1px solid var(--line)}
+@media(max-width:600px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.hint{font-size:14px;margin:10px 0 0;padding-left:18px}
+.hint li{margin:3px 0}
+/* steps */
+.bar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+.btn{border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 12px;min-height:44px}
+.btn.pri{background:var(--red);color:#fff;border-color:var(--red)}
+.btn.sm{min-height:36px;padding:4px 10px;font-size:14px}
+.btn:disabled{opacity:.4;cursor:default}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.st{background:var(--bg);border:1.5px solid var(--line);border-radius:12px;padding:8px 10px;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:8px;align-items:center}
+.st.sel{border-color:var(--red2)}
+.st.k-heat{border-left:5px solid var(--red2)}.st.k-rest{border-left:5px solid var(--mute)}.st.k-pour,.st.k-drain{border-left:5px solid var(--soy)}.st.k-add{border-left:5px solid var(--ok)}
+.when{font-size:12px;color:var(--mute);line-height:1.25;text-align:center;font-variant-numeric:tabular-nums}
+.when b{display:block;font-size:15px;color:var(--ink)}
+.fl{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fl select,.fl input{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 6px;min-height:38px;font-size:16px}
+.fl input[type=number]{width:78px;text-align:right}
+.fl .nm{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 10px;min-height:38px;font-weight:700}
+.fl label{font-size:14px;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--card);padding:6px 10px;min-height:38px}
+.seg button[aria-pressed=true]{background:var(--red2);color:#fff}
+.ops{display:flex;gap:2px}
+.ops button{border:0;background:none;width:34px;height:38px;border-radius:8px;color:var(--mute);font-size:16px}
+.ops button:hover{background:var(--card);color:var(--ink)}
+.unit{font-size:14px;color:var(--mute)}
+.st .sn{display:none;flex-basis:100%}.st.sel .sn{display:block}
+@media(max-width:600px){.st{grid-template-columns:38px minmax(0,1fr);padding:6px 8px}.ops{grid-column:1/-1;justify-content:flex-end}.st:not(.sel) .ops{display:none}}
+/* lower */
+.lower{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;margin-top:22px}
+@media(max-width:900px){.lower{grid-template-columns:minmax(0,1fr)}}
+.tfig{position:relative;height:240px}.tfig>svg{position:absolute;inset:0;width:100%;height:100%}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;padding:4px 8px;border-radius:6px;white-space:nowrap;display:none}
+.rows{display:flex;flex-direction:column;gap:2px}
+.row{display:grid;grid-template-columns:56px minmax(0,1fr) 44px 64px;gap:8px;align-items:center;padding:5px 4px;border-radius:8px;border:0;background:none;text-align:left;width:100%}
+.row:hover{background:var(--bg)}
+.row .tr{position:relative;height:12px;background:var(--bg);border-radius:6px}
+.row .fill{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--red2)}
+.row .tk{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--tgt);border-radius:2px}
+.row .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.row .d{font-size:13px;color:var(--mute);white-space:nowrap}
+.srcs{font-size:13px;color:var(--mute);padding:0 6px 8px 66px}
+.neg .fill{background:var(--warn)}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}
+th{font-size:13px;color:var(--mute);font-weight:500}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.warns{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.warns li{padding:8px 10px 8px 12px;border-radius:8px;background:var(--bg);border-left:4px solid var(--mute);font-size:15px}
+.warns li.l1{border-color:var(--warn)}.warns li.l2{border-color:var(--bad)}.warns li.ok{border-color:var(--ok)}
+h2{font-size:22px;margin-bottom:8px}
+h3{font-size:17px;margin:14px 0 6px}
+/* modal */
+.mask{position:fixed;inset:0;background:rgba(20,12,8,.55);display:none;align-items:flex-end;justify-content:center;z-index:9}
+.mask.on{display:flex}
+.modal{background:var(--bg);width:min(760px,100%);max-height:86vh;border-radius:16px 16px 0 0;display:flex;flex-direction:column}
+@media(min-width:700px){.mask{align-items:center}.modal{border-radius:16px}}
+.mh{padding:14px 16px 8px;display:flex;gap:8px;align-items:center}
+.mh input{flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;min-height:44px;background:var(--card);font-size:16px}
+.cats{display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px}
+.cats button{flex:none;border:1px solid var(--line);background:var(--card);border-radius:18px;padding:6px 12px;min-height:38px}
+.cats button[aria-pressed=true]{background:var(--soy);color:var(--bg);border-color:var(--soy)}
+.pick{overflow-y:auto;padding:0 16px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.pick button{text-align:left;border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:8px 10px;min-height:44px}
+.pick button b{display:block}
+.pick button span{font-size:13px;color:var(--mute);line-height:1.35;display:block}
+details{margin-top:22px}summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
+.note{font-size:14px;color:var(--mute)}
+textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:8px;font:14px/1.4 ui-monospace,monospace;color:var(--ink)}
+.mine{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+@media(prefers-reduced-motion:no-preference){.st{transition:border-color .15s}.row .fill{transition:width .25s}}
+
+.modes{display:flex;gap:4px;margin:0 0 14px;flex-wrap:wrap}
+.modes a{color:#fff;text-decoration:none;padding:9px 16px;border-radius:10px 10px 0 0;min-height:44px;display:flex;align-items:center;font-weight:700;border-bottom:3px solid transparent;opacity:.8}
+.modes a[aria-current=page]{opacity:1;border-bottom-color:#fff;background:rgba(255,255,255,.12)}
+body:not([data-mode=remix]) #dishes{display:none}
+body:not([data-mode=remix]) .top{padding-bottom:6px}
+.view[hidden]{display:none}
+.stove{display:grid;grid-template-columns:minmax(0,1fr) 64px;gap:12px;align-items:stretch}
+.wokfig{position:relative;height:300px;background:light-dark(#efe9e4,#0e0b0a);border-radius:12px;overflow:hidden}
+.wokfig>svg{position:absolute;inset:0;width:100%;height:100%}
+.gauge{position:relative;border-radius:10px;overflow:hidden;background:linear-gradient(to top,#8fb3c9 0%,#8fb3c9 36%,#e9d48a 38%,#f0a43a 42%,#e8452c 62%,#7a1d14 73%,#2b2522 100%)}
+.gauge i{position:absolute;left:-2px;right:-2px;height:4px;background:var(--ink);box-shadow:0 0 0 2px var(--bg);transition:bottom .25s}
+.gauge span{position:absolute;left:4px;font-size:11px;color:#fff;text-shadow:0 1px 2px #000}
+.readout{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0}
+.readout div{background:var(--bg);border-radius:10px;padding:6px 10px;font-size:13px;color:var(--mute)}
+.readout b{display:block;font:700 22px/1.1 "Noto Serif SC",serif;color:var(--ink);font-variant-numeric:tabular-nums}
+@media(max-width:600px){.readout{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+.ctl .seg button{min-height:44px;padding:6px 12px}
+.btn[aria-pressed=true]{background:var(--soy);color:var(--bg);border-color:var(--soy)}
+.clist{list-style:none;margin:0;padding:0;font-size:14px}.clist li{padding:3px 0;border-bottom:1px dashed var(--line)}
+.slog{list-style:none;margin:0;padding:0;font-size:14px;max-height:190px;overflow-y:auto}.slog li{padding:2px 0}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px}
+.chips button{flex:none;border:1px solid var(--line);background:var(--bg);border-radius:18px;padding:6px 12px;min-height:40px}
+.chips button[aria-pressed=true]{background:var(--soy);color:var(--bg);border-color:var(--soy)}
+.sgrid{display:flex;flex-wrap:wrap;gap:6px;max-height:180px;overflow-y:auto;padding:4px 0}
+.sgrid button{border:1.5px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 10px;min-height:40px}
+.sgrid button[aria-pressed=true]{border-color:var(--red2);color:var(--red2);font-weight:700}
+#spick{background:var(--bg);border-radius:10px;padding:10px;margin-top:8px}
+#spick input[type=number]{width:84px;border:1px solid var(--line);border-radius:8px;padding:6px;min-height:40px;background:var(--card);text-align:right;font-size:16px}
+.near{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media(max-width:600px){.near{grid-template-columns:minmax(0,1fr)}}
+.ncard{background:var(--bg);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:2px;border:1.5px solid var(--line)}
+.ncard.first{border-color:var(--red2)}
+.big2{font:900 30px/1 "Noto Serif SC",serif;color:var(--red2)}
+.xlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.xlist li[data-i]{display:grid;grid-template-columns:minmax(90px,130px) minmax(0,1fr) 76px 16px 36px;gap:8px;align-items:center;background:var(--bg);border-radius:10px;padding:6px 8px}
+.xlist .xn{display:flex;flex-direction:column;line-height:1.2}.role{font-size:12px;color:var(--mute)}
+.xlist .xt{grid-column:1/-1;font-size:13px;display:none}.xlist li:focus-within .xt{display:block}
+.xlist input[type=number]{border:1px solid var(--line);border-radius:8px;padding:6px;min-height:38px;background:var(--card);text-align:right;font-size:16px;width:100%}
+.xlist input[type=range]{width:100%;accent-color:var(--soy);min-height:32px}
+.x{border:0;background:none;color:var(--mute);width:36px;height:38px;border-radius:8px}
+@media(max-width:600px){.xlist li[data-i]{grid-template-columns:minmax(0,1fr) 76px 16px 36px}.xlist input[type=range]{grid-column:1/-1;grid-row:2}}
+#xparams{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0}
+#xparams label{display:flex;align-items:center;gap:5px;font-size:15px}
+#xparams select,#xparams input[type=number]{border:1px solid var(--line);border-radius:8px;padding:6px;min-height:40px;background:var(--bg);font-size:16px}
+#xparams input[type=number]{width:76px}
+.xshelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px}
+.xshelf button{text-align:left;border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;min-height:44px}
+.xshelf button span{display:block;font-size:12.5px;color:var(--mute);line-height:1.35}
+.xshelf button[aria-pressed=true]{border-color:var(--soy)}
+.layers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.layers div{background:var(--bg);border-radius:10px;padding:8px 10px;font-size:14px;line-height:1.6}
+.layers b{display:block;font-size:13px;color:var(--mute);font-weight:500}
+.srow{display:grid;grid-template-columns:90px minmax(0,1fr) 44px;gap:8px;align-items:center;font-size:14px;padding:2px 0}
+.srow .tr{height:10px;background:var(--bg);border-radius:5px;position:relative;overflow:hidden}.srow .fill{position:absolute;inset:0 auto 0 0;border-radius:5px}
+.srow .v{text-align:right;font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:no-preference){.flame{animation:fl .35s ease-in-out infinite alternate;transform-origin:center bottom;transform-box:fill-box}@keyframes fl{to{transform:scaleY(.82)}}.steam{animation:st 1.6s ease-in-out infinite alternate}@keyframes st{to{opacity:.1;transform:translateY(-6px)}}}
+.sgridx{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);grid-template-areas:"top shelf" "more taste" "more aroma";gap:16px 22px;align-items:start}
+.sa-top{grid-area:top}.sa-more{grid-area:more}.sa-shelf{grid-area:shelf}.sa-taste{grid-area:taste}.sa-aroma{grid-area:aroma}
+@media(max-width:900px){.sgridx{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "shelf" "taste" "aroma" "more"}}
+</style></head><body>
+<header class="top">
+ <h1>锅气 · 中餐调味模拟器</h1>
+ <p id="sub">选一道经典菜作底，改调料的种类、用量、下锅顺序和火候，看锅温、出水、焦化怎样一步步改变最终味道。</p>
+ <nav class="modes" aria-label="模式"><a href="#remix">改经典菜</a><a href="#stove">从零下厨</a><a href="#spice">调香料</a></nav>
+ <nav class="dishes" id="dishes" aria-label="经典菜"></nav>
+</header>
+<main class="wrap view" id="v-remix">
+ <div class="grid">
+  <section class="card res" aria-label="味道结果">
+   <div class="score"><div class="big" id="score">–</div><div><div class="tags" id="types"></div><div class="note" id="method" style="margin-top:6px"></div></div></div>
+   <div class="fig" id="radar"><svg role="img" aria-label="味道雷达图"></svg></div>
+   <div class="legend"><span><i style="background:var(--red2)"></i>你的调配</span><span id="lgT"><i style="background:var(--tgt);height:0;border-top:2px dashed var(--tgt)"></i>标准做法</span><span>分值 0–10，按人对浓度的对数感知换算</span></div>
+   <div class="facts" id="facts"></div>
+   <ul class="hint" id="hints"></ul>
+  </section>
+  <section aria-label="步骤">
+   <h2 id="dname">步骤</h2>
+   <p class="desc" id="ddesc"></p>
+   <div class="fl" style="margin-bottom:6px">
+    <label>成品在 <select id="fin"><option value="pot">锅</option><option value="A">A 碗</option><option value="B">B 碗</option><option value="C">C 盘</option></select></label>
+    <label>吃法 <select id="eat"><option value="all">连汁一起吃</option><option value="drain">只吃料（汤汁不喝）</option></select></label>
+   </div>
+   <div class="bar">
+    <button class="btn pri" data-new="add">＋ 下料</button><button class="btn" data-new="heat">＋ 加热</button><button class="btn" data-new="rest">＋ 静置/腌</button><button class="btn" data-new="pour">＋ 倒入/盛出</button><button class="btn" data-new="drain">＋ 沥油/沥汁</button>
+    <button class="btn" id="undo" title="撤销">↶ 撤销</button><button class="btn" id="reset">还原标准做法</button><button class="btn" id="clear">空锅</button>
+   </div>
+   <p class="note" id="insHint"></p>
+   <ol class="steps" id="steps"></ol>
+   <div class="mine"><input id="saveName" placeholder="给你的版本起个名" style="border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--card);font-size:16px"><button class="btn" id="save">保存到本机</button><span id="mineList" class="tags"></span></div>
+  </section>
+ </div>
+ <div class="lower">
+  <section class="card"><h2>锅温与汤汁</h2><div class="tfig" id="tchart"><svg role="img" aria-label="锅温随时间变化"></svg><div class="tip" id="tip"></div></div>
+   <div class="legend"><span><i style="background:var(--red2)"></i>锅温 °C</span><span><i style="background:var(--soy);opacity:.5;height:8px"></i>锅中水分 g</span><span>竖线 = 第几步</span></div>
+   <h3>口感与火候</h3><div style="overflow-x:auto"><table id="tex"></table></div>
+  </section>
+  <section class="card"><h2>味道拆解</h2><p class="note" style="margin:0 0 6px">点某一味看它从哪里来。竖线是标准做法的值。</p><div class="rows" id="dims"></div></section>
+ </div>
+ <section class="card" style="margin-top:22px"><h2>师傅提醒</h2><ul class="warns" id="warns"></ul></section>
+ <section class="card" id="raroma" hidden style="margin-top:22px"></section>
+ <details><summary>模拟怎么算的</summary><div class="note" style="max-width:75ch">
+  <p>逐秒推进：锅的热容与火力（小/中/大 ≈ 0.9/1.7/3 kW）决定升温；锅里有水时温度被钉在 100°C，多余热量蒸发水分，加盖蒸发约降到一成；干锅时食材越多、出水越多，锅温越上不去。热锅遇料汁会瞬间汽化降温。</p>
+  <p>每种调料分三部分：稳定呈味（盐、糖、酸、鲜）、受热消散的生鲜气（生蒜辛冲、葱花香菜清香、香油）、需要提取的香（葱姜蒜花椒辣椒豆瓣在各自油温窗口里煸出，香料在水里慢慢煮出）。超过焦化温度会转成糊味和苦味；糖在干锅 150°C 以上焦化，过 190°C 发苦；醋久煮酸味挥发；料酒在 78°C 以上挥发并带走腥味；香叶桂皮久煮出苦。</p>
+  <p>食材有熟度、胶原软化、表面美拉德焦化、出水、出油、吸油（茄子）、入味和腥膻。上浆能护嫩。味道按“调料总量 ÷ 成菜总重”算浓度，再按感知交互修正：甜压酸和苦，咸让鲜显出来，麻放大辣，香料葱姜和辣味掩盖腥膻。</p>
+  <p>数值是对家常经验的近似，用来看趋势和比较，不是精确的化学计算。</p></div></details>
+ <details><summary>导出 / 导入配方</summary><div class="fl"><button class="btn sm" id="copyJ">复制当前配方</button><span class="note" id="copyMsg"></span></div><textarea id="imp" placeholder="把复制的配方粘贴到这里"></textarea><button class="btn sm" id="doImp">导入</button></details>
+</main>
+<main class="wrap view" id="v-stove" hidden>
+ <div class="sgridx">
+  <section class="card sa-top">
+   <div class="stove"><div class="wokfig"><svg id="wok" viewBox="40 30 340 250" preserveAspectRatio="xMidYMid meet" role="img" aria-label="锅"></svg></div>
+    <div class="gauge" aria-label="锅温计"><span style="bottom:36%">100°</span><span style="bottom:58%">150°</span><span style="bottom:73%">190°</span><i id="smark" style="bottom:8%"></i></div></div>
+   <div class="readout"><div>计时<b id="sclock">0:00</b></div><div>锅温 · <span id="szone">温</span><b id="stemp">22°C</b></div><div>锅中水分<b id="swat">0 g</b></div><div>锅中油<b id="soil">0 g</b></div></div>
+   <div class="ctl"><span class="seg" id="sfire"><button data-v="0" aria-pressed="true">关火</button><button data-v="1" aria-pressed="false">小火</button><button data-v="2" aria-pressed="false">中火</button><button data-v="3" aria-pressed="false">大火</button></span>
+    <button class="btn" id="slid" aria-pressed="false">没盖盖</button><select id="smode" class="btn"><option value="wok">锅中加热</option><option value="steam">隔水蒸</option></select></div>
+   <div class="ctl"><button class="btn pri" id="splay" aria-pressed="false">▶ 开始计时</button><span class="seg" id="sspeed"><button data-v="1" aria-pressed="false">1×</button><button data-v="5" aria-pressed="true">5×</button><button data-v="20" aria-pressed="false">20×</button></span>
+    <span class="seg" id="sskip"><button data-s="10">+10秒</button><button data-s="30">+30秒</button><button data-s="60">+1分</button><button data-s="300">+5分</button></span></div>
+   <p class="note" style="margin:0">开火后时间按倍速走；随时暂停下料。也可以停着计时，用“+10秒”等按钮一段段推进。</p>
+  </section>
+  <section class="card sa-more">
+   <h3 style="margin-top:0">锅碗里有什么</h3><div id="scont"></div>
+   <h3>挪动</h3><div class="ctl" id="smove"><button class="btn sm" data-from="A" data-to="pot">A 碗倒入锅</button><button class="btn sm" data-from="B" data-to="pot">B 碗倒入锅</button><button class="btn sm" data-from="pot" data-to="C" data-what="foods">锅中食材盛到 C 盘</button><button class="btn sm" data-from="C" data-to="pot">C 盘倒回锅</button><button class="btn sm" data-from="pot" data-to="C">全部出锅到 C 盘</button>
+    <span class="fl"><button class="btn sm" data-drain="oil">沥油</button><button class="btn sm" data-drain="water">倒汤汁</button><label class="unit">只留 <input id="skeep" type="number" value="20" min="0" step="5" style="width:64px"> g</label></span></div>
+   <h3>记录</h3><ul class="slog" id="slog"></ul>
+  </section>
+   <div class="card sa-shelf"><h2>调料架</h2>
+    <div class="fl" style="margin-bottom:6px"><span class="unit">放进</span><span class="seg" id="sto"><button data-v="pot" aria-pressed="true">锅</button><button data-v="A" aria-pressed="false">A 碗</button><button data-v="B" aria-pressed="false">B 碗</button><button data-v="C" aria-pressed="false">C 盘</button></span>
+     <input id="sq" placeholder="搜索" style="flex:1;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"></div>
+    <div class="chips" id="scats"></div><div class="sgrid" id="sgrid"></div><div id="spick"></div></div>
+   <div class="card sa-taste"><h2>此刻出锅的味道</h2><div class="tags" id="stypes"></div>
+    <div class="fig" id="sradar" style="height:300px"><svg role="img" aria-label="当前味道雷达"></svg></div>
+    <ul class="warns" id="swarn"></ul>
+    <div class="fl" style="margin-top:10px"><label class="unit">吃法 <select id="seat" class="btn"><option value="all">连汁吃</option><option value="drain">只吃料</option></select></label><button class="btn pri" id="sserve">出锅评菜</button><button class="btn" id="sreset">重来</button></div></div>
+  <div class="card sa-aroma" id="saroma" hidden></div>
+ </div>
+ <section class="card" id="sreport" hidden style="margin-top:22px"><h2>出锅评语</h2><div id="srep"></div></section>
+</main>
+<main class="wrap view" id="v-spice" hidden>
+ <div class="grid">
+  <section>
+   <div class="card"><h2>配方</h2><p class="note" style="margin:0 0 6px">从经典香型起步，或清空后自己配。</p>
+    <div class="chips" id="xpre"></div><div id="xparams"></div>
+    <ul class="xlist" id="xlist"></ul>
+    <div class="fl" style="margin-top:8px"><button class="btn sm" id="xclear">清空</button></div>
+    <h3>香料架</h3><div class="chips" id="xcats"></div><div class="xshelf" id="xshelf"></div></div>
+  </section>
+  <section class="card res"><h2>复合香味</h2><p id="xdesc" style="margin:0 0 4px"></p>
+   <div class="fig" id="xradar" style="height:320px"><svg role="img" aria-label="香气轮"></svg></div>
+   <div class="legend"><span><i style="background:var(--soy)"></i>你的配方</span><span><i style="background:var(--tgt);height:0;border-top:2px dashed var(--tgt)"></i>所选经典香型</span></div>
+   <div class="layers" id="xlayers"></div>
+   <h3>谁贡献了香气</h3><div id="xshare"></div>
+   <div id="xcurvebox"><h3>提取曲线</h3><div class="tfig" id="xcurve" style="height:200px"><svg role="img" aria-label="香气与苦涩随时间"></svg></div><p class="note" id="xbest"></p></div>
+  </section>
+ </div>
+ <div class="lower">
+  <section class="card"><h2>最像的经典香型</h2><div class="near" id="xmatch"></div><h3>适合做</h3><div class="tags" id="xdish"></div><ul class="hint" id="xrules"></ul></section>
+  <section class="card"><h2>配料提醒</h2><ul class="warns" id="xwarn"></ul>
+   <h3>放进调料架</h3><p class="note" style="margin:0 0 6px">把这包料变成一种调料，在“改经典菜”和“从零下厨”里使用。</p>
+   <div class="fl"><input id="xname" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn pri" id="xsend">加入调料架</button></div><p class="note" id="xsent"></p></section>
+ </div>
+</main>
+<div class="mask" id="mask"><div class="modal" role="dialog" aria-label="选择食材或调料"><div class="mh"><input id="q" placeholder="搜索：蒜、花椒、五花…"><button class="btn" id="mclose">关闭</button></div><div class="cats" id="mcats"></div><div class="pick" id="mpick"></div></div></div>
+<script>
+// ===== 数据与模拟引擎 =====
+const DIMS=[['salt','咸'],['sweet','甜'],['sour','酸'],['umami','鲜'],['spicy','辣'],['numb','麻'],['pungent','辛冲'],['wok','爆香'],['roast','焦香'],['ferment','酱香'],['spice','香料'],['fresh','清香'],['bitter','苦'],['rich','醇厚']];
+const NEG=[['off','腥膻'],['burnt','糊味'],['booze','酒气']];
+const ALLD=DIMS.concat(NEG).map(d=>d[0]);
+
+// 调料：tas 稳定呈味(每克)，raw 生鲜气味(受热消散)，aroO 油中煸出的香，aroW 水中煮出的味
+const IT={};
+function S(id,name,cat,o){IT[id]=Object.assign({id,name,cat,kind:'s',wat:0,tas:{},raw:{},rawK:.006,rawT:60,aroO:{},aroW:null,rOil:0,win:[110,160],rWater:0,rCold:null,vol:.0004,burnT:999,bRate:.04,bBit:.2,bBurnt:.3,def:5,tin:22,note:''},o);
+  const d=IT[id];if(!d.aroW){d.aroW={};for(const k in d.aroO){if(k!=='wok'&&k!=='roast')d.aroW[k]=d.aroO[k]*.7}}
+  if(d.rCold==null)d.rCold=d.rWater*.08;}
+// 咸鲜酱料
+S('salt','盐','咸鲜',{tas:{salt:1},def:3,note:'1% 左右的咸度最适口'});
+S('ls','生抽','咸鲜',{liq:1,wat:.7,tas:{salt:.16,umami:.12,sweet:.03,ferment:.1},aroO:{ferment:.12,roast:.08},rOil:.06,win:[140,200],burnT:215,bBit:.15,vol:.0008,col:{brown:.2},def:10,note:'沿锅边烹入有酱香；收干后继续烧会糊'});
+S('lc','老抽','咸鲜',{liq:1,wat:.65,tas:{salt:.13,sweet:.08,ferment:.08,umami:.04},aroO:{roast:.06},rOil:.03,win:[150,200],burnT:210,col:{brown:1.2},def:5,note:'主要上色，多了发黑发苦'});
+S('hy','蚝油','咸鲜',{liq:1,wat:.6,tas:{salt:.09,umami:.35,sweet:.12,rich:.04},vol:.0003,burnT:190,bBit:.2,def:10,note:'久煮鲜味会钝，宜中后段下'});
+S('wj','味精','咸鲜',{tas:{umami:3},msg:1,def:1,note:'需配合盐才鲜；高温干锅久炒会分解'});
+S('jj','鸡精','咸鲜',{tas:{umami:1.6,salt:.35},msg:1,def:2});
+S('yl','鱼露','咸鲜',{liq:1,wat:.7,tas:{salt:.22,umami:.3,off:.04},def:5});
+S('db','郫县豆瓣','咸鲜',{wat:.4,tas:{salt:.15,spicy:.08,ferment:.12,umami:.05},aroO:{ferment:.45,spicy:.2,wok:.1,roast:.05},aroW:{ferment:.18,spicy:.15},raw:{bitter:.02},rawT:100,rOil:.012,win:[95,145],rWater:.0025,burnT:168,bRate:.03,bBit:.35,bBurnt:.4,col:{red:1},def:20,note:'中小火用油炒出红油才香；直接下汤有生酱味'});
+S('ds','豆豉','咸鲜',{wat:.3,tas:{salt:.1,ferment:.3,umami:.12},aroO:{ferment:.4,roast:.1},rOil:.015,win:[100,150],rWater:.002,burnT:172,bBit:.3,def:6});
+S('hdj','黄豆酱','咸鲜',{wat:.5,tas:{salt:.12,ferment:.3,umami:.1,sweet:.03},aroO:{ferment:.3,roast:.05},rOil:.015,win:[100,150],rWater:.002,burnT:165,bBit:.3,col:{brown:.3},def:15});
+S('tmj','甜面酱','咸鲜',{wat:.45,tas:{salt:.08,sweet:.15,ferment:.25},aroO:{ferment:.25,roast:.1},rOil:.015,win:[95,140],rWater:.002,burnT:158,bRate:.05,bBit:.35,col:{brown:.5},def:20,note:'含糖高，最易炒糊，需小火'});
+S('fr','红腐乳','咸鲜',{wat:.45,tas:{salt:.1,ferment:.35,umami:.2,sweet:.05},col:{red:.4},def:10});
+S('zmj','芝麻酱','咸鲜',{wat:.05,tas:{rich:.35,roast:.18,bitter:.008},def:15});
+S('fqj','番茄酱','咸鲜',{liq:.4,wat:.7,tas:{sweet:.12,sour:.06,salt:.03,umami:.05},raw:{sour:.03},rawT:90,aroO:{roast:.05,wok:.02},rOil:.01,win:[100,150],burnT:165,col:{red:.8},def:30,note:'下油炒一下能去生酸味、出红油'});
+S('gt','高汤','咸鲜',{wat:.97,tas:{umami:.025,rich:.02,salt:.002},water:1,def:200});
+S('qs','清水','咸鲜',{wat:1,water:1,def:200});
+S('rs','热水','咸鲜',{wat:1,water:1,tin:90,def:400,note:'炖肉加热水，肉不易紧缩'});
+S('kl','可乐','咸鲜',{wat:.89,water:1,tas:{sweet:.032,sour:.004},sugar:.106,col:{brown:.02},def:330});
+// 甜
+S('bt','白糖','甜',{tas:{sweet:.3},sugar:1,def:10,note:'干锅 150°C 以上焦化成焦香，190°C 以上发苦'});
+S('bingt','冰糖','甜',{tas:{sweet:.27,rich:.03},sugar:1,def:20,note:'炒糖色、红烧收汁出亮'});
+S('ht','红糖','甜',{tas:{sweet:.24,roast:.03},sugar:1,col:{brown:.3},def:10});
+S('fm','蜂蜜','甜',{wat:.18,tas:{sweet:.26,fresh:.02},sugar:1.2,def:10});
+// 酸
+S('xc','香醋','酸',{liq:1,wat:.9,tas:{sour:.15,umami:.02,sweet:.02,ferment:.03},tv:.0008,tvd:['sour','ferment'],acid:1,col:{brown:.15},def:15,note:'久煮酸味挥发；出锅前沿锅边淋最显'});
+S('cc','陈醋','酸',{liq:1,wat:.88,tas:{sour:.19,ferment:.06},tv:.0007,tvd:['sour'],acid:1,col:{brown:.2},def:15});
+S('bc','白醋','酸',{liq:1,wat:.92,tas:{sour:.17},tv:.001,tvd:['sour'],acid:1,def:10});
+S('nm','柠檬汁','酸',{liq:1,wat:.9,tas:{sour:.25},raw:{fresh:.3},rawK:.02,acid:1,def:10});
+S('pj','泡椒','酸',{wat:.8,tas:{salt:.05,sour:.04,spicy:.1},raw:{fresh:.05},aroO:{wok:.08,spicy:.06},rOil:.015,win:[105,150],rWater:.002,burnT:175,col:{red:.6},def:25,note:'鱼香味的灵魂'});
+S('scai','酸菜','酸',{liq:.15,wat:.9,tas:{sour:.025,salt:.02,umami:.01},aroO:{ferment:.04,wok:.02},aroW:{ferment:.035},rOil:.01,win:[100,160],rWater:.002,def:150});
+S('dj','剁椒','酸',{wat:.6,tas:{salt:.1,spicy:.2,sour:.02},aroO:{wok:.05},rOil:.02,win:[100,150],col:{red:.7},def:30});
+// 辣
+S('gla','干辣椒段','辣',{tas:{spicy:.03},aroO:{spicy:.22,roast:.12,wok:.04},aroW:{spicy:.15},rOil:.02,win:[115,160],rWater:.0015,burnT:178,bRate:.04,bBit:.3,bBurnt:.45,col:{red:.6},whole:1,hula:1,def:8,note:'130–160°C 油温炸至棕红出煳辣香，发黑即苦'});
+S('xmj','小米辣','辣',{wat:.85,tas:{spicy:.4},raw:{fresh:.1,pungent:.05},aroO:{wok:.05},rOil:.02,def:8});
+S('ljm','辣椒面','辣',{tas:{spicy:.22},aroO:{roast:.25,wok:.08,spicy:.15},rOil:.08,win:[105,150],rWater:.004,burnT:165,bRate:.06,bBit:.3,bBurnt:.4,col:{red:1},def:5,note:'泼热油（约 180°C）最香'});
+S('hyou','红油','辣',{oil:1,tas:{spicy:.12,roast:.1,rich:.05},col:{red:1},def:15});
+S('bhj','白胡椒粉','辣',{tas:{spicy:.5},raw:{pungent:.8,spice:.2},rawK:.004,def:1,note:'香气易散，出锅前放'});
+S('hhj','黑胡椒碎','辣',{tas:{spicy:.4},raw:{pungent:.4,spice:.4},rawK:.004,aroO:{spice:.3,roast:.05},rOil:.02,win:[100,150],def:2});
+S('qjiao','青红椒','辣',{wat:.92,tas:{spicy:.02,sweet:.01},raw:{fresh:.08},aroO:{wok:.03,roast:.02},rOil:.01,win:[120,200],burnT:220,def:50,note:'作配料；作主料请在食材里选'});
+// 麻
+S('hj','红花椒','麻',{aroO:{numb:1.1,spice:.25,wok:.05},aroW:{numb:.9,spice:.15},rOil:.02,win:[105,150],rWater:.0018,rCold:.0003,burnT:170,bRate:.05,bBit:.4,bBurnt:.3,whole:1,def:3,note:'油温过 170°C 发黑变苦'});
+S('hjm','花椒面','麻',{tas:{numb:.9},raw:{spice:.3},aroO:{spice:.2,roast:.05},rOil:.1,win:[100,140],rWater:.004,burnT:160,bRate:.06,bBit:.3,def:2});
+S('qhj','青花椒','麻',{aroO:{numb:1.2,fresh:.5},aroW:{numb:.95,fresh:.3},rOil:.03,win:[100,140],rWater:.002,vol:.003,burnT:160,bRate:.06,bBit:.35,whole:1,def:5,note:'藤椒清香，怕高温'});
+S('tjy','藤椒油','麻',{oil:1,tas:{numb:.6},raw:{fresh:.4},rawK:.01,rawT:70,def:5});
+S('hjy','花椒油','麻',{oil:1,tas:{numb:.8},raw:{spice:.1},def:5});
+// 辛香
+S('cong','葱','辛香',{wat:.9,raw:{pungent:.05,fresh:.1},rawK:.012,aroO:{wok:.25,sweet:.02},aroW:{fresh:.02,sweet:.02},rOil:.03,win:[110,150],rWater:.002,rCold:.0004,burnT:175,bRate:.05,bBit:.1,bBurnt:.3,def:20,note:'葱白炝锅出香，葱花出锅撒保留清香'});
+S('jiang','姜','辛香',{wat:.85,raw:{pungent:.2,fresh:.03},rawK:.01,aroO:{wok:.15,pungent:.05},aroW:{pungent:.07,spice:.03},rOil:.02,win:[110,165],rWater:.002,rCold:.0004,burnT:185,bBit:.15,def:10,note:'去腥压膻'});
+S('suan','蒜','辛香',{wat:.65,raw:{pungent:.35},rawK:.015,aroO:{wok:.4,sweet:.02},aroW:{sweet:.03,umami:.02},rOil:.03,win:[105,150],rWater:.002,rCold:.0005,burnT:163,bRate:.07,bBit:.5,bBurnt:.5,def:12,note:'生蒜辛辣；油温超 165°C 易糊苦'});
+S('yc','洋葱','辛香',{wat:.89,raw:{pungent:.05},aroO:{wok:.08,sweet:.06,roast:.03},aroW:{sweet:.05},rOil:.01,win:[110,170],burnT:190,def:80});
+S('xcai','香菜','辛香',{wat:.9,raw:{fresh:.25},rawK:.02,rawT:55,def:10,note:'遇热香气很快散失'});
+S('sm','蒜苗/青蒜','辛香',{wat:.9,raw:{fresh:.08,pungent:.06},rawK:.01,aroO:{wok:.15,sweet:.02},rOil:.02,win:[110,160],burnT:180,def:50});
+// 香料
+const SP=(o)=>{o.aroW=Object.assign({},o.aroO);return Object.assign({vol:.00015,rOil:.004,win:[100,160],rWater:.0007,burnT:180,bRate:.03,bBit:.3,whole:1},o)};
+S('bj','八角','香料',SP({aroO:{spice:1.0,sweet:.03},ob:.04,okMin:120,def:4,note:'1 颗约 2g'}));
+S('gp','桂皮','香料',SP({aroO:{spice:.9,sweet:.04},ob:.15,okMin:60,def:3,note:'久煮发苦发涩'}));
+S('xy','香叶','香料',SP({aroO:{spice:1.2},ob:.3,okMin:45,def:.6,note:'1 片约 0.3g，30 分钟后捞出'}));
+S('cg','草果','香料',SP({aroO:{spice:.9},ob:.15,okMin:90,def:4,note:'压羊肉牛肉腥膻，需拍破'}));
+S('dx','丁香','香料',SP({aroO:{spice:2.4,numb:.1},ob:.3,okMin:60,def:.3,note:'味极冲，几粒即可'}));
+S('xhx','小茴香','香料',SP({aroO:{spice:1.1},rOil:.01,ob:.05,okMin:120,def:2}));
+S('cp','陈皮','香料',SP({aroO:{spice:.4,fresh:.35,bitter:.01},ob:.02,okMin:180,def:3}));
+S('sn','山奈/白芷','香料',SP({aroO:{spice:1.3},ob:.15,okMin:60,def:1}));
+S('zr','孜然','香料',{aroO:{spice:1.3,roast:.3},raw:{spice:.5},rOil:.03,win:[110,165],rWater:.003,burnT:178,bBit:.3,zr:1,def:6,note:'遇热油才爆出香'});
+S('wxf','五香粉','香料',{raw:{spice:.6},aroO:{spice:.9},rOil:.05,win:[100,150],rWater:.005,rCold:.001,burnT:165,bBit:.3,def:2});
+S('ssx','十三香','香料',{raw:{spice:.7},aroO:{spice:1.0},rOil:.05,win:[100,150],rWater:.005,rCold:.001,burnT:165,bBit:.3,def:2});
+S('gl','咖喱粉','香料',{raw:{spice:.4},aroO:{spice:1.1,spicy:.15,roast:.1},rOil:.04,win:[100,150],rWater:.004,burnT:165,bBit:.3,curry:1,col:{yellow:1},def:15});
+S('zm','熟芝麻','香料',{tas:{roast:.25,rich:.05},def:5});
+S('hs','油酥花生','香料',{tas:{roast:.12,rich:.04},def:40});
+// 酒
+S('lj','料酒','酒',{liq:1,wat:.85,alc:.12,tas:{umami:.02,sweet:.02},aroO:{ferment:.02},def:10,note:'热锅烹入，酒精带走腥味'});
+S('huj','黄酒/花雕','酒',{liq:1,wat:.82,alc:.15,tas:{sweet:.04,umami:.03,ferment:.04},def:20});
+S('baij','白酒','酒',{liq:1,wat:.5,alc:.5,def:5});
+S('lz','醪糟','酒',{liq:.6,wat:.75,alc:.03,tas:{sweet:.04,sour:.01,ferment:.03},sugar:.12,def:20});
+S('pij','啤酒','酒',{wat:.92,alc:.04,water:1,tas:{bitter:.004,sweet:.01},def:330});
+// 油
+S('cy','菜籽油','油',{oil:1,raw:{off:.012,bitter:.006},rawT:125,rawK:.05,aroO:{wok:.02},rOil:.01,win:[150,250],tas:{rich:.02},def:30,note:'需烧熟去生油味，川菜常用'});
+S('hsy','花生油','油',{oil:1,tas:{rich:.03},aroO:{wok:.02},rOil:.01,win:[150,250],def:30});
+S('zy','猪油','油',{oil:1,tas:{rich:.12},aroO:{wok:.05},rOil:.02,win:[100,220],def:20});
+S('xyou','香油','油',{oil:1,raw:{roast:.3,rich:.02},rawT:90,rawK:.012,def:3,note:'受热香气散，出锅淋'});
+S('dian','淀粉','其他',{starch:1,def:5,note:'上浆护嫩；水淀粉勾芡挂汁'});
+S('jdq','蛋清','其他',{liq:.5,wat:.88,starch:.4,tas:{umami:.01},def:15});
+S('xs','小苏打','其他',{tas:{bitter:.1},soda:1,def:1,note:'嫩肉，多了发涩'});
+const CATS=['咸鲜','甜','酸','辣','麻','辛香','香料','酒','油','其他'];
+
+// 食材：wr 最大失水比例，coll 胶原软化所需分钟，cook 断生分钟(丁大小)
+const FD={};
+function F(id,name,cat,o){FD[id]=Object.assign({id,name,cat,kind:'f',wr:.25,fat:0,umami:.004,off:0,sweet:0,sour:0,fresh:0,spicy:0,cook:1.5,coll:0,oab:0,cut:'片',tin:12,lean:0,mustCook:1},o)}
+F('wh','五花肉','肉',{fat:.35,umami:.011,off:.004,cook:3,coll:40,wr:.2,cut:'块'});
+F('lji','猪里脊','肉',{fat:.05,umami:.012,off:.003,cook:1.4,lean:1,wr:.28,cut:'丝'});
+F('pg','排骨','肉',{fat:.2,umami:.012,off:.005,cook:4,coll:30,wr:.22,cut:'块'});
+F('rm','猪肉末','肉',{fat:.2,umami:.012,off:.004,cook:1,wr:.25,cut:'末'});
+F('nr','牛里脊','肉',{fat:.06,umami:.015,off:.005,cook:1.1,lean:1,wr:.28,cut:'片'});
+F('nn','牛腱/牛腩','肉',{fat:.12,umami:.016,off:.006,cook:4,coll:60,wr:.3,cut:'大块'});
+F('yr','羊肉','肉',{fat:.15,umami:.014,off:.011,cook:1.4,coll:55,wr:.27,cut:'片'});
+F('jt','鸡腿肉','禽',{fat:.1,umami:.013,off:.004,cook:2,coll:20,wr:.22,cut:'丁'});
+F('jx','鸡胸肉','禽',{fat:.02,umami:.011,off:.003,cook:1.3,lean:1,wr:.3,cut:'丁'});
+F('jc','鸡翅','禽',{fat:.16,umami:.012,off:.004,cook:2.5,coll:15,wr:.2,cut:'整'});
+F('ya','鸭肉','禽',{fat:.25,umami:.013,off:.01,cook:3,coll:45,wr:.2,cut:'块'});
+F('yu','鱼(鲈/草鱼)','水产',{fat:.04,umami:.014,off:.006,cook:1,lean:1,fish:1,wr:.22,cut:'片'});
+F('xia','虾','水产',{fat:.01,umami:.02,sweet:.004,off:.004,cook:.5,lean:1,fish:1,wr:.2,cut:'整'});
+F('dfu','豆腐','豆制品',{umami:.004,off:.0015,cook:1,wr:.15,tofu:1,cut:'块'});
+F('jd','鸡蛋','蛋',{fat:.1,umami:.012,off:.0015,cook:1.2,lean:1,egg:1,wr:.1,cut:'液'});
+F('qz','茄子','蔬菜',{umami:.002,sweet:.003,cook:2.5,oab:.3,wr:.2,soft:1,cut:'条',mustCook:0});
+F('td','土豆','蔬菜',{umami:.002,sweet:.002,cook:6,wr:.08,starchy:1,cut:'丝',mustCook:1});
+F('qcai','青菜','蔬菜',{umami:.003,sweet:.002,fresh:.006,cook:.4,wr:.45,leaf:1,cut:'整',mustCook:0});
+F('qjz','青椒','蔬菜',{umami:.001,sweet:.003,fresh:.008,spicy:.003,cook:.9,wr:.2,cut:'块',mustCook:0});
+F('fq','番茄','蔬菜',{umami:.006,sweet:.004,sour:.006,cook:1,wr:.35,soft:1,cut:'块',mustCook:0});
+F('xg','香菇/蘑菇','菌菇',{umami:.02,cook:1.5,wr:.35,cut:'片',mustCook:1});
+F('dou','四季豆','蔬菜',{umami:.002,sweet:.003,fresh:.004,cook:4,wr:.15,bean:1,cut:'段'});
+F('mr','木耳','菌菇',{umami:.003,cook:.8,wr:.05,cut:'丝'});
+F('hlb','胡萝卜','蔬菜',{sweet:.007,cook:1.5,wr:.1,cut:'丝',mustCook:0});
+F('hg','黄瓜','蔬菜',{fresh:.012,sweet:.002,cook:.5,wr:.3,cut:'条',mustCook:0});
+F('ms','粉丝','其他',{cook:1,wr:-.5,cut:'整',mustCook:1});
+const CUTS={'末':.25,'丝':.35,'液':.4,'片':.5,'条':.7,'丁':.8,'段':.8,'块':1.6,'整':2.4,'大块':2.8,'整条':3.5};
+const FCATS=['肉','禽','水产','蛋','豆制品','蔬菜','菌菇','其他'];
+
+function clamp(x,a,b){return x<a?a:x>b?b:x}
+function mkC(id,name){return{id,name,items:[],foods:[],T:22,water:0,oil:0,lid:0,isPot:id==='pot',hot:0,maxT:22}}
+function heatCap(c){let C=c.isPot?400:150;C+=c.water*4.18+c.oil*2;for(const f of c.foods)C+=(f.g-f.wl+f.oa)*3.4;for(const e of c.items){const d=IT[e.id];if(!d.oil&&!d.water)C+=e.g*2.5}return C}
+function foodMass(c){let m=0;for(const f of c.foods)m+=Math.max(0,f.g-f.wl+f.oa);return m}
+
+function addTo(c,id,g,cut,prep){
+  const C0=heatCap(c);let tin;
+  if(FD[id]){const d=FD[id];cut=cut||d.cut;const f={id,g,cut,sf:CUTS[cut]||1,done:0,over:0,tender:0,brown:0,burnt:0,wl:0,fr:0,off:1,abs:0,oa:0,coated:0};
+    if(prep==='blanch'){f.off=.45;f.done=.25;f.tender=d.coll?.08:0;f.wl=g*.05}
+    if(prep==='preboil'){f.off=.35;f.done=1;f.over=.3;f.tender=d.coll?.5:0;f.wl=g*.12;f.abs=.05}
+    c.foods.push(f);tin=prep?40:d.tin}
+  else{const d=IT[id];c.items.push({id,g,ro:0,rw:0,rawLeft:1,lost:0,tl:0,burn:0,car:0,alc:g*(d.alc||0),gel:0,wetSec:0,msgDeg:0});
+    if(d.water)c.water+=g*d.wat; else if(d.liq)c.water+=g*d.wat*d.liq;
+    if(d.oil)c.oil+=g; tin=d.tin}
+  const C1=heatCap(c);c.T=(C0*c.T+(C1-C0)*tin)/C1;
+  flash(c);
+}
+function flash(c){ // 热锅遇水瞬间汽化
+  if(c.T>100&&c.water>0){const C=heatCap(c);const ev=Math.min(c.water,(c.T-100)*C/2260);c.water-=ev;c.T-=ev*2260/C;}
+}
+function sizzle(src,dst){ // 泼油：热油浇在料上瞬间激香
+  let T=src.T;const oilHot=src.oil>8&&src.foods.length===0&&src.water<5&&T>120;if(!oilHot)return 0;
+  for(let i=0;i<25;i++){for(const e of dst.items){const d=IT[e.id];if(!d.rOil)continue;const free=Math.max(0,1-e.ro-e.rw);
+      if(T>=d.win[0]){const fr=Math.min(1.5,(T-d.win[0])/(d.win[1]-d.win[0])+.3);e.ro+=d.rOil*fr*free*Math.min(1,src.oil/30)}
+      if(T>d.rawT)e.rawLeft*=Math.exp(-d.rawK*Math.min(3,(T-d.rawT)/40));if(T>d.burnT)e.burn+=.25*d.bRate*(T-d.burnT)/20*(1-e.burn)}
+    T=100+(T-100)*Math.exp(-1/3)}
+  dst.sizzled=1;return 1}
+function moveAll(src,dst,what){
+  sizzle(src,dst);
+  const C0=heatCap(dst),Cs=heatCap(src),T0=dst.T,Ts=src.T;
+  if(what==='foods'){const mf=foodMass(src),tot=mf+src.water+src.oil+1;const fr=Math.min(.9,mf/tot+.15);
+    dst.foods.push(...src.foods);src.foods=[];
+    for(const e of src.items){const n=Object.assign({},e);n.g=e.g*fr;n.alc=e.alc*fr;e.g*=1-fr;e.alc*=1-fr;dst.items.push(n)}
+    const w=src.water*fr*.5,o=src.oil*.25;dst.water+=w;src.water-=w;dst.oil+=o;src.oil-=o;}
+  else{dst.foods.push(...src.foods);dst.items.push(...src.items);dst.water+=src.water;dst.oil+=src.oil;src.foods=[];src.items=[];src.water=0;src.oil=0;}
+  const C1=heatCap(dst);dst.T=(C0*T0+(C1-C0)*Ts)/Math.max(1,C1);dst.maxT=Math.max(dst.maxT,dst.T);flash(dst);
+}
+
+function tick(c,fire,mode,lid,dt){
+  const mf=foodMass(c);const C=heatCap(c);
+  let wet=c.water>Math.max(4,.1*mf);const steam=fire>0&&mode==='steam';
+  if(fire>0){
+    if(steam){c.T+=(100-c.T)*dt/50;c.water+=.03*dt;wet=true}
+    else{const P=[0,900,1700,3000][fire];const base=(mode==='bake'?[0,160,200,240]:[0,175,210,250])[fire];
+      if(wet){ if(c.T<100){c.T+=(P-3*(c.T-25))*dt/C;if(c.T>100)c.T=100}
+               if(c.T>=100){c.T=100;const ev=[0,.12,.35,.9][fire]*(lid?.12:1)*(mode==='bake'?.6:1)*dt;c.water=Math.max(0,c.water-ev)} }
+      else{let Q=P*(base-c.T)/(base-25);if(c.T>100)Q-=.08*mf*(c.T-100);
+        if(c.water>0){const ev=Math.min(c.water,Math.max(0,Q)*.8/2260*dt);c.water-=ev;Q-=ev*2260/dt}
+        c.T+=Q*dt/C;}}
+  }else{c.T+=(25-c.T)*(c.isPot?3:6)*dt/C}
+  c.maxT=Math.max(c.maxT,c.T);
+  const T=c.T;
+  // 食材
+  for(const f of c.foods){const d=FD[f.id];
+    let r=T<55?0:T<100?Math.pow((T-55)/45,1.5):1+(T-100)/60;
+    const dd=r/(60*d.cook*Math.pow(f.sf,1.3))*dt;
+    if(f.done<1){f.done+=dd;if(f.done>1){f.over+=f.done-1;f.done=1}}else f.over+=dd*(f.coated?.5:1);
+    if(d.coll&&T>80)f.tender+=(wet?1:.4)*Math.min(1,(T-80)/15)*dt/(60*d.coll*Math.sqrt(f.sf));
+    if(!wet&&T>125){const sug=c.items.some(e=>IT[e.id].sugar&&e.g>3)?1.3:1;f.brown+=(T-125)/60*.011*dt/Math.pow(f.sf,.3)*sug*(d.leaf?.6:1);
+      if(f.brown>1.5&&T>140)f.burnt+=.004*(T-140)/40*dt}
+    if(T>65&&d.wr>0&&f.wl<f.g*d.wr){const x=f.g*d.wr*.0015*(T>100?1.6:1)*dt/Math.pow(f.sf,.7);f.wl+=x;c.water+=x}
+    if(d.wr<0&&c.water>0&&T>60){const x=Math.min(c.water,f.g*.01*dt);if(f.wl>f.g*d.wr){f.wl-=x;c.water-=x}}
+    if(d.fat>0&&T>95&&f.fr<f.g*d.fat*.55){const x=f.g*d.fat*.0008*dt*(wet?.6:1.5)/Math.sqrt(f.sf);f.fr+=x;c.oil+=x}
+    if(d.oab&&T>100&&c.oil>2&&f.oa<f.g*d.oab){const x=Math.min(c.oil-1,f.g*d.oab*.02*dt);f.oa+=x;c.oil-=x}
+    if(T>90)f.off*=Math.exp(-(steam?.0012:lid?.0001:(wet?.0006:.0015))*dt);
+    const liq=c.water>2;const k=(liq?(T>80?.0007:.00025):.00008)*dt/f.sf;f.abs+=k*(1-f.abs);
+    if(!f.coated&&f.done<.2&&c.items.some(e=>IT[e.id].starch&&e.g>=2))f.coated=1;
+  }
+  // 调料
+  for(const e of c.items){const d=IT[e.id];const free=Math.max(0,1-e.ro-e.rw);
+    if(!wet&&!steam&&T>=d.win[0]&&c.oil>2&&d.rOil){const fr=Math.min(1.5,(T-d.win[0])/(d.win[1]-d.win[0])+.3);e.ro+=d.rOil*fr*dt*free}
+    else if((wet)&&T>40&&d.rWater){const fr=Math.min(1,(T-40)/55);e.rw+=d.rWater*fr*dt*free*(steam?.6:1);if(T>90)e.wetSec+=dt}
+    else if(c.water>1&&d.rCold){e.rw+=d.rCold*dt*free}
+    if(T>d.rawT)e.rawLeft*=Math.exp(-d.rawK*Math.min(3,(T-d.rawT)/40)*dt);
+    const lf=T<60?.05:(T-50)/50;e.lost+=d.vol*lf*(lid?.3:1)*dt*(1-e.lost);
+    if(d.tv&&T>=95)e.tl+=d.tv*(lid?.25:1)*(T>110?3:1)*dt*(1-e.tl);
+    if(T>d.burnT)e.burn+=d.bRate*(T-d.burnT)/20*dt*(1-e.burn);
+    if(d.sugar&&!wet&&T>150)e.car=Math.min(1.7,e.car+.012*(T-150)/30*dt);
+    if(e.alc>0){const k=T<50?.0002:T<78?.003:(lid?.004:.03)*(T>100?1.5:1);const da=e.alc*k*dt;e.alc-=da;
+      if(T>=70&&mf>0)for(const f of c.foods)f.off*=Math.exp(-60*da/mf*(lid?.5:1));}
+    if(d.starch&&T>65&&c.water>0)e.gel=1;
+    if(d.msg&&!wet&&T>140)e.msgDeg+=.002*dt;
+  }
+  c.lid=lid;
+}
+
+function drainC(c,kind,keep){
+  if(kind==='water'){if(c.water>keep){const r=keep/c.water;for(const e of c.items){const d=IT[e.id];if(!d.oil){e.g*=r+(1-r)*.25}}for(const f of c.foods)f.off*=.85;c.water=keep}}
+  else{if(c.oil>keep){const r=keep/c.oil;for(const e of c.items){if(IT[e.id].oil)e.g*=r; else if(e.ro>0){e.g*=r+(1-r)*.6}}c.oil=keep}}}
+function liveNew(){const cs={pot:mkC('pot','炒锅'),A:mkC('A','A 碗'),B:mkC('B','B 碗'),C:mkC('C','C 盘')};
+  return{cs,hist:[{t:0,T:22,w:0,o:0}],marks:[],potLog:[],t:0,steps:[],errs:[],cur:null}}
+function liveRec(L){const p=L.cs.pot;L.hist.push({t:L.t,T:p.T,w:p.water,o:p.oil})}
+function liveRun(L,sec,fire,mode,lid,record){const cs=L.cs;
+  for(let i=0;i<sec;i++){tick(cs.pot,fire,mode,lid,1);for(const k of['A','B','C'])tick(cs[k],0,'wok',0,1);L.t++;
+    L.potLog.push({fire,mode,lid,T:cs.pot.T,wet:cs.pot.water>Math.max(4,.1*foodMass(cs.pot)),oil:cs.pot.oil,food:cs.pot.foods.length,items:cs.pot.items.some(e=>!IT[e.id].oil)});
+    if(L.t%3===0)liveRec(L)}
+  if(record&&sec>0){const t=fire>0?'heat':'rest';const c=L.cur;
+    if(c&&c.t===t&&(t==='rest'||(c.f===fire&&(c.m||'wok')===mode))&&!!c.lid===!!lid)c.s+=sec;
+    else{const s={t,s:sec};if(t==='heat'){s.f=fire;if(mode!=='wok')s.m=mode}if(lid)s.lid=1;L.marks.push({t:L.t-sec,i:L.steps.length});L.steps.push(s);L.cur=s}}}
+function liveApply(L,s,record){const cs=L.cs;
+  if(record){L.marks.push({t:L.t,i:L.steps.length});L.steps.push(s);L.cur=null}
+  if(s.t==='add'){if(!IT[s.id]&&!FD[s.id]){L.errs.push(L.steps.length-1);return}const c=cs[s.c||'pot'];addTo(c,s.id,+s.g||0,s.cut,s.prep);c.maxT=Math.max(c.maxT,c.T);liveRec(L)}
+  else if(s.t==='heat')liveRun(L,Math.round(+s.s||0),+s.f||2,s.m||'wok',s.lid?1:0,false);
+  else if(s.t==='rest')liveRun(L,Math.round(+s.s||0),0,'wok',s.lid?1:0,false);
+  else if(s.t==='pour'){if(s.from!==(s.to||'pot'))moveAll(cs[s.from],cs[s.to||'pot'],s.what||'all');liveRec(L)}
+  else if(s.t==='drain'){drainC(cs[s.c||'pot'],s.kind,+s.keep||0);liveRec(L)}}
+function simulate(steps){const L=liveNew();steps.forEach((s,i)=>{L.marks.push({t:L.t,i});liveApply(L,s,false)});L.marks.push({t:L.t,i:steps.length});L.steps=steps;return L}
+function zero(){const o={};for(const k of ALLD)o[k]=0;return o}
+function disp(x){return x<=0?0:10*(1-Math.exp(-x/6.5))}
+
+function evaluate(sim,final,eat){
+  const c=sim.cs[final]||sim.cs.pot;
+  const S=zero(),Fo=zero(),src={};for(const k of ALLD)src[k]=[];
+  const addS=(k,v,name)=>{if(!v)return;S[k]+=v;src[k].push([name,v,'s'])};
+  const addF=(k,v,name)=>{if(!v)return;Fo[k]+=v;src[k].push([name,v,'f'])};
+  let starchG=0,anyGel=0,ssol=0;const flags={};const col={red:0,brown:0,yellow:0};
+  for(const e of c.items){const d=IT[e.id],g=e.g;
+    if(!d.oil&&!d.water&&!d.whole)ssol+=g*(1-(d.wat||0));
+    for(const k in d.tas){let v=g*d.tas[k];if(d.tvd&&d.tvd.includes(k))v*=1-e.tl;if(k==='umami'&&d.msg)v*=1-.4*Math.min(1,e.msgDeg);addS(k,v,d.name)}
+    for(const k in d.raw)addS(k,g*d.raw[k]*e.rawLeft,d.name);
+    const keep=(1-e.lost)*(1-e.burn);
+    for(const k of new Set(Object.keys(d.aroO).concat(Object.keys(d.aroW)))){addS(k,g*((d.aroO[k]||0)*e.ro+(d.aroW[k]||0)*e.rw)*keep,d.name)}
+    if(e.burn>.02){addS('burnt',g*d.bBurnt*e.burn,d.name+'(焦)');addS('bitter',g*d.bBit*e.burn,d.name+'(焦)')}
+    if(d.sugar){const sg=g*d.sugar;addS('roast',sg*.2*Math.min(1,e.car),d.name+'(焦糖)');const sb=Math.max(0,(e.car-1)/.6);if(sb>0){addS('burnt',sg*.3*sb,d.name+'(炒过头)');addS('bitter',sg*.25*sb,d.name+'(炒过头)');addS('sweet',-sg*.3*.5*sb,d.name)}col.brown+=sg*Math.min(1,e.car)*.6}
+    if(d.okMin){const over=clamp((e.wetSec/60-d.okMin)/d.okMin,0,2);if(over>0)addS('bitter',g*d.ob*over,d.name+'(久煮)')}
+    if(e.alc>0)addS('booze',e.alc*3,d.name);
+    if(d.starch){starchG+=g*d.starch;if(e.gel)anyGel=1}
+    if(d.col){col.red+=(d.col.red||0)*g*(d.oil?1:Math.min(1,e.ro+e.rw*.5+(d.tas.spicy?.3:0)));col.brown+=(d.col.brown||0)*g;col.yellow+=(d.col.yellow||0)*g}
+    if(d.hula&&e.ro>.25&&e.burn<.35)flags.hula=1;
+    if(e.id==='pj')flags.pj=1;if(d.zr)flags.zr=1;if(d.curry)flags.curry=1;if(e.id==='zmj')flags.zmj=1;if(e.id==='db'&&e.ro>.3)flags.db=1;if(e.id==='cp')flags.cp=1;
+    if(e.id==='suan'&&e.rawLeft>.6)flags.rawGarlic=(flags.rawGarlic||0)+g*e.rawLeft;
+    if(e.id==='tmj'||e.id==='hdj')flags.jiang=1;if(e.id==='hyou'||(e.id==='ljm'&&e.ro>.3))flags.hongyou=1;
+  }
+  addS('rich',c.oil*.03,'锅中油脂');
+  let mf=0,hasFish=0,absW=0;const tex=[];
+  for(const f of c.foods){const d=FD[f.id],g=f.g,m=Math.max(0,g-f.wl+f.oa);mf+=m;absW+=f.abs*m;if(d.fish)hasFish=1;
+    const dn=Math.min(1,f.done);
+    addF('umami',.7*g*d.umami*(.4+.6*dn)*(1+.4*Math.min(1,f.brown)),d.name);
+    addF('sweet',g*d.sweet*(.6+.4*dn),d.name);addF('sour',g*d.sour*dn,d.name);
+    addF('fresh',g*d.fresh*(1-.7*dn),d.name);addF('spicy',g*d.spicy,d.name);
+    addF('off',g*d.off*f.off*(dn<.6?1.3:1),d.name);
+    addF('rich',g*d.fat*.06*(1-.5*f.fr/(g*d.fat+.01))+(d.coll?g*.006*Math.min(1.5,f.tender):0)+f.oa*.05,d.name);
+    addF('roast',g*.025*Math.min(1.3,f.brown),d.name+'(焦化)');
+    if(f.burnt>.05){addF('burnt',g*.04*f.burnt,d.name+'(焦糊)');addF('bitter',g*.02*f.burnt,d.name+'(焦糊)')}
+    col.brown+=g*.004*Math.min(1.3,f.brown);
+    tex.push(texture(f,d));
+  }
+  let cling=0;if(anyGel&&c.water>3)cling=Math.min(1,starchG/(c.water*.04+1));
+  addS('rich',cling*starchG*.25,'勾芡');
+  const water=c.water,oil=c.oil;let sSc,fSc;
+  if(eat==='drain'){const M2=Math.max(60,mf+water+ssol);const a=mf>0?absW/mf:0;sSc=500/M2*(a*.85+.2+.15*cling);fSc=500/Math.max(60,mf)}
+  else{const M=Math.max(60,mf+water+.35*oil+ssol);sSc=500/M*(1+.15*cling);fSc=500/M}
+  const x=zero();for(const k of ALLD)x[k]=S[k]*sSc+Fo[k]*fSc;
+  for(const k of ALLD)for(const r of src[k])r[1]*=r[2]==='s'?sSc:fSc;
+  // 感知交互
+  x.umami*=.45+.55*Math.min(1,x.salt/3);
+  x.salt*=1+.06*Math.min(1,x.umami/6)+.06*Math.min(1,x.sour/5);
+  const s0=x.sweet,a0=x.sour;x.sour=a0*(1-.3*Math.min(1,s0/8));x.sweet=s0*(1-.2*Math.min(1,a0/8));x.bitter*=1-.35*Math.min(1,s0/8);
+  x.spicy*=(1+.15*Math.min(1,x.numb/5))*(1-.12*Math.min(1,x.rich/8));
+  x.umami*=1-.25*Math.min(1,x.spicy/10);
+  const mask=x.spice+.5*x.pungent+.4*x.wok+.3*x.spicy+.3*x.ferment+.2*x.roast+.3*x.numb;
+  x.off*=Math.exp(-mask/12);if(hasFish)x.off*=Math.exp(-x.sour/10);
+  const D={};for(const k of ALLD)D[k]=+disp(Math.max(0,x[k])).toFixed(2);
+  for(const k of ALLD)src[k].sort((a,b)=>b[1]-a[1]);
+  const M=Math.max(60,mf+water+.35*oil+ssol);
+  const color=colorOf(col,M);
+  const sauce=water<5?(oil>40?'油润':'干香'):water<0.15*mf?(cling>.3?'亮芡裹汁':'少量汤汁'):water<0.6*mf?(cling>.3?'浓汁':'有汤汁'):'汤菜';
+  return{D,x,src,tex,mf,water,oil,cling,sauce,color,flags,c,absAvg:mf?absW/mf:0};
+}
+function colorOf(col,M){const r=col.red*500/M,b=col.brown*500/M,y=col.yellow*500/M;
+  let name,hex;if(b>32){name='酱黑';hex='#3b2214'}else if(r>8&&b>4){name='红亮酱色';hex='#8e2a17'}else if(r>8){name='红亮';hex='#c8321e'}else if(b>6){name='酱红';hex='#7a3f1d'}else if(r>3){name='微红';hex='#d9683f'}else if(y>8){name='金黄';hex='#d9a321'}else if(b>2.5){name='浅酱/金黄';hex='#b9803c'}else{name='本色清爽';hex='#e8dcc0'}return{name,hex,r,b}}
+function texture(f,d){const dn=f.done;let lab;
+  if(dn<.6)lab=d.mustCook?'生':'生脆';else if(dn<.97)lab=d.mustCook?'未熟透':'七八成熟';
+  else if(d.fat>=.2&&f.sf<1.2&&!(d.coll&&f.tender<.15&&f.over<1)){lab=f.brown>.6?'起灯盏窝·干香':f.over<2?'软嫩':'干香'}
+  else if(d.coll&&(f.sf>=1.2||(d.coll>=40&&f.sf>=.8))){const need=f.sf<.6?.25:1;const t=f.tender/need;lab=t<.4?'硬韧嚼不动':t<1?'偏韧':t<1.8?'软糯':'酥烂脱骨'}
+  else if(d.lean||d.coll){const o=d.coll?f.over/2:f.over;lab=o<1?'滑嫩':o<3?'刚好':o<6?'偏老':(d.fish?'老散':'柴老')}
+  else if(false){lab=f.over<.6?'滑嫩':f.over<1.6?'刚好':f.over<3?'偏老':(d.fish?'老散':'柴老')}
+  else if(d.tofu)lab=f.over<6?'嫩滑':'起孔入味';
+  else if(d.leaf)lab=f.over<1?'脆嫩':f.over<3?'软':'黄软';
+  else if(d.soft)lab=f.over<1?'断生':f.over<3?'软':'软烂入味';
+  else if(d.bean)lab=f.over<2?'脆嫩':'皱皮软香';
+  else if(d.starchy)lab=f.sf<.5?(f.over<1?'爽脆':f.over<2.5?'软':'软塌'):(f.over<2?'断生':'软糯起沙');
+  else lab=f.over<1.2?'爽脆':f.over<3?'软':'软烂';
+  let surf='';if(f.burnt>.3)surf='焦糊';else if(f.brown>1)surf=d.leaf||d.cat==='蔬菜'?'虎皮焦边':'金黄焦香';else if(f.brown>.4)surf='微焦';
+  return{id:f.id,name:FD[f.id].name,cut:f.cut,lab,surf,done:dn,over:f.over,tender:f.tender,abs:f.abs,off:f.off,brown:f.brown,burnt:f.burnt,coated:f.coated,must:d.mustCook,bean:d.bean,cat:d.cat}}
+
+function flavorTypes(D,fl){const L=[];const g=k=>D[k];
+  if(fl.hula&&g('sweet')>2&&g('sour')>1.8&&g('spicy')>1.5)L.push(['煳辣荔枝味','宫保系：煳辣香+小荔枝（甜酸近）']);
+  if(fl.pj&&g('sweet')>2&&g('sour')>2&&g('wok')>2)L.push(['鱼香味','泡椒+葱姜蒜+糖醋，咸甜酸辣兼备']);
+  if(g('numb')>3&&g('spicy')>3.5)L.push(['麻辣味','花椒的麻与辣椒的辣叠加']);
+  if(g('sweet')>2.5&&g('sour')>2.5&&g('salt')>2&&g('spicy')>2.5&&g('numb')>2.5&&fl.zmj)L.push(['怪味','咸甜麻辣酸鲜香七味调和']);
+  if(fl.db&&g('spicy')>2.5&&g('ferment')>3&&g('numb')<3.5)L.push(['家常味','郫县豆瓣炒香为底，咸鲜微辣']);
+  if(fl.hongyou&&g('spicy')>3&&g('sweet')>1)L.push(['红油味','红油的香辣+咸甜']);
+  if(!fl.pj&&!fl.hula&&g('sweet')>4.5&&g('sour')>3.5&&g('spicy')<2)L.push(['糖醋味','甜酸为主，咸味托底']);
+  else if(!fl.pj&&!fl.hula&&g('sweet')>2.5&&g('sour')>2.2&&g('spicy')<2)L.push(['荔枝味','酸甜接近，入口酸后回甜']);
+  if(g('sour')>3&&g('spicy')>3&&g('sweet')<2.5)L.push(['酸辣味','醋酸与辣椒辣并重']);
+  if(g('numb')>3&&g('fresh')>2.5&&g('spicy')<2.5)L.push(['椒麻/藤椒味','花椒麻+葱或青花椒清香']);
+  if(g('spicy')>4&&g('roast')>3&&g('numb')<3&&!fl.hula)L.push(['香辣味','辣香与焦香']);
+  if(fl.hula&&g('numb')>2.5&&g('spicy')>3&&g('sweet')<2)L.push(['煳辣味','干辣椒花椒炝出的煳香']);
+  if(fl.zr&&g('spice')>3)L.push(['孜然味','西北风味，孜然遇热油爆香']);
+  if(fl.curry)L.push(['咖喱味','咖喱香料复合']);
+  if(fl.jiang&&g('ferment')>4.5&&g('sweet')>2)L.push(['酱香味','甜面酱/黄酱炒香']);
+  if(fl.cp&&g('fresh')>2)L.push(['陈皮味','陈皮甘香']);
+  if(g('salt')>3&&g('sweet')>3&&g('roast')>1.2&&g('ferment')>2&&g('spicy')<2&&g('sour')<2.5)L.push(['咸甜味(红烧)','酱油糖色，咸中带甜']);
+  if(g('spice')>4.5&&!fl.zr&&!fl.curry)L.push(['五香/卤香味','八角桂皮等香料长时间煮出']);
+  if(fl.rawGarlic>8&&g('pungent')>3.5)L.push(['蒜泥味','生蒜辛香']);
+  if(g('wok')>4&&g('spicy')<2.5&&g('sweet')<3&&g('sour')<2)L.push(['葱姜蒜香(爆炒)','镬气足，咸鲜为主']);
+  if(!L.length){if(g('salt')>2.5&&g('umami')>2.5)L.push(['咸鲜味','以盐、酱油、鲜味为主，突出本味']);else if(g('salt')<2)L.push(['清淡','调味很轻']);else L.push(['复合味','不属于典型味型'])}
+  return L.slice(0,3)}
+
+function detectMethods(sim){const L=[];const log=sim.potLog;let seg=null;
+  const lab=p=>{if(p.fire===0)return null;if(p.mode==='steam')return'蒸';if(p.mode==='bake')return'烤';
+    if(!p.food){if(p.wet)return'熬汤/煮汁';return p.items&&p.T>100?'炝锅/炒料':null}
+    if(p.wet)return p.lid?'焖/炖':'烧/煮';if(p.oil>250&&p.T>140)return'炸';if(p.T>150)return'大火爆炒';if(p.T>115)return'煸炒';return'中低温炒'};
+  for(const p of log){const l=lab(p);if(!l)continue;if(seg&&seg.l===l)seg.n++;else{seg={l,n:1};L.push(seg)}}
+  const out=[];for(const s of L){if(s.n<8)continue;let nm=s.l;if(nm==='烧/煮'&&s.n>900)nm='长时间烧煮';if(nm==='焖/炖'&&s.n>1500)nm='慢炖';
+    if(out.length&&out[out.length-1].l===nm)out[out.length-1].n+=s.n;else out.push({l:nm,n:s.n})}
+  for(const k of['A','B','C'])if(sim.cs[k].sizzled)out.push({l:'泼油',n:0});
+  const last=log[log.length-1];if(out.length&&last&&!last.wet&&out.some(o=>/烧|炖|焖/.test(o.l)))out.push({l:'收汁',n:0});
+  return out;}
+
+function warnings(sim,ev){const W=[];const add=(lv,t)=>W.push([lv,t]);const c=ev.c;const D=ev.D;
+  const allItems=[];for(const k in sim.cs)for(const e of sim.cs[k].items)allItems.push(e);
+  for(const e of c.items){const d=IT[e.id];
+    if(e.burn>.25)add(2,`${d.name}炒糊了（焦化 ${Math.round(e.burn*100)}%）：锅温超过 ${d.burnT}°C。可降火或晚点下。`);
+    if(d.sugar&&e.car>1.15)add(2,`${d.name}焦化过度发苦：糖在干锅里超过 190°C 会由焦香变苦。`);
+    if(d.okMin&&e.wetSec/60>d.okMin*1.3)add(e.wetSec/60>d.okMin*2?1:0,`${d.name}煮了 ${Math.round(e.wetSec/60)} 分钟，超过约 ${d.okMin} 分钟会出苦涩味，宜中途捞出。`);
+    if(d.tv&&e.tl>.4)add(1,`${d.name}久煮挥发了约 ${Math.round(e.tl*100)}% 的酸味，想要酸感明显可在出锅前再淋。`);
+    if(e.id==='xyou'&&e.rawLeft<.5)add(1,'香油受热太久，芝麻香散失大半，应出锅前淋。');
+    if((e.id==='xcai'||e.id==='cong')&&e.rawLeft<.3&&e.ro<.2&&e.rw<.3)add(0,`${d.name}的清香在高温里散了，想留香可出锅前撒。`);
+    if(e.id==='db'&&e.rw>e.ro&&e.rw>.15)add(1,'豆瓣酱没用油炒就进了汤，酱香和红油出不来，带生酱味。先中小火炒 1–2 分钟出红油。');
+    if((e.id==='hj'||e.id==='gla'||e.id==='zr')&&e.ro+e.rw<.25&&e.g>1)add(1,`${d.name}的味没出来（释放 ${Math.round((e.ro+e.rw)*100)}%）：需要热油煸或长时间煮。`);
+    if(e.id==='cy'&&e.rawLeft>.6&&e.g>10)add(1,'菜籽油没烧熟（未到 150°C 以上），会有生油味。');
+    if(d.msg&&e.msgDeg>.3)add(0,'味精在干锅高温下久炒会部分分解，出锅前放更鲜。');
+    if(e.id==='xs'&&e.g>2)add(1,'小苏打放多了会发涩有碱味。');
+  }
+  if(D.booze>2)add(1,'酒气没挥发：料酒要在热锅中烹入，或开盖煮一会儿。');
+  if(D.off>3.5)add(2,`腥膻味明显（${D.off.toFixed(1)}）：可焯水、热锅烹料酒、多放姜葱或香料、炖时先开盖。`);else if(D.off>2)add(1,`有些许腥膻（${D.off.toFixed(1)}）。`);
+  if(D.burnt>3)add(2,'整体有明显糊味。');
+  for(const t of ev.tex){
+    if(t.must&&t.done<.97)add(2,`${t.name}没熟（熟度 ${Math.round(t.done*100)}%）${t.bean?'：四季豆不熟透含皂素和凝集素，可能引起中毒！':'，需延长加热。'}`);
+    if(t.lab==='柴老'||t.lab==='老散')add(1,`${t.name}${t.lab}：加热过度${t.coated?'':'；下锅前上浆（淀粉/蛋清）能护嫩'}。`);
+    if(t.lab==='偏老')add(0,`${t.name}略老，可缩短时间或提高火力快炒。`);
+    if(t.lab.startsWith('硬韧'))add(1,`${t.name}炖得不够，胶原还没软化（软化度 ${Math.round(t.tender*100)}%），需要小火加盖长时间炖。`);
+    if(t.surf==='焦糊')add(2,`${t.name}表面焦糊了。`);
+  }
+  const salt=D.salt;if(ev.mf<=50){}else if(salt>8)add(2,`太咸了（咸度 ${salt.toFixed(1)}）。`);else if(salt>6.8)add(1,`偏咸（${salt.toFixed(1)}）。`);else if(salt<2.5&&D.sweet<4)add(1,`偏淡（咸度 ${salt.toFixed(1)}）。`);
+  if(D.bitter>3)add(1,`苦味突出（${D.bitter.toFixed(1)}），查看哪种调料糊了或久煮。`);
+  // 炒菜出水
+  const pl=sim.potLog;let wetStir=0,dryHot=0;for(const p of pl){if(p.fire>0&&p.mode==='wok'&&p.food&&!p.lid){if(p.wet&&p.T>=99)wetStir++;if(!p.wet&&p.T>150)dryHot++}}
+  if(dryHot<30&&wetStir>90&&wetStir<500&&pl.length<900)add(0,'这是在"煮"而不是"炒"：火力小或一次下料太多，食材出水降温，镬气不足。');
+  if(ev.mf>0&&D.spicy<1&&c.items.some(e=>e.id==='gla'&&e.g>3)&&ev.oil<5)add(0,'辣椒素是脂溶性的，油太少辣香出不来。');
+  const seen=new Set();return W.filter(w=>!seen.has(w[1])&&seen.add(w[1]));}
+
+const WT={salt:1.5,sweet:1.2,sour:1.2,umami:.8,spicy:1.2,numb:1.2,pungent:.6,wok:.8,roast:.7,ferment:.8,spice:.8,fresh:.5,bitter:.8,rich:.5,off:.8,burnt:1,booze:.6};
+const FIX={salt:['盐/生抽','少放盐或生抽'],sweet:['糖','糖'],sour:['醋（出锅前淋）','醋，或早点下醋让它挥发'],umami:['蚝油/味精，并保证咸度','鲜味料'],spicy:['干辣椒/豆瓣/小米辣','辣椒'],numb:['花椒','花椒'],pungent:['生蒜/姜/胡椒','生蒜生姜，或让它们多加热'],wok:['葱姜蒜用热油煸香','葱姜蒜'],roast:['提高火力煎香/炒糖色','焦香：降火或缩短干煸'],ferment:['豆瓣/甜面酱/生抽并炒香','酱料'],spice:['八角桂皮等香料，或延长炖煮','香料'],fresh:['出锅撒葱花香菜/青花椒','清香料'],bitter:['','苦味：检查是否糊了或香料久煮'],rich:['油/勾芡/延长炖煮','油量']};
+function compare(D,T){let s=0,w=0;const diffs=[];for(const k in WT){const d=(D[k]||0)-(T[k]||0);s+=WT[k]*d*d;w+=WT[k];if(Math.abs(d)>.8)diffs.push([k,d])}
+  const rms=Math.sqrt(s/w);diffs.sort((a,b)=>Math.abs(b[1])*WT[b[0]]-Math.abs(a[1])*WT[a[0]]);return{score:Math.round(clamp(100*(1-rms/4.5),0,100)),diffs:diffs.slice(0,4),rms}}
+
+
+// ===== 经典菜预设（标准做法即该菜的目标味道） =====
+const a=(c,id,g,cut,prep)=>{const s={t:'add',c,id,g};if(cut)s.cut=cut;if(prep)s.prep=prep;return s};
+const h=(f,s,lid,m)=>{const o={t:'heat',f,s};if(lid)o.lid=1;if(m)o.m=m;return o};
+const r=(s)=>({t:'rest',s});
+const p=(from,to,what)=>({t:'pour',from,to:to||'pot',what:what||'all'});
+const dr=(c,kind,keep)=>({t:'drain',c,kind,keep});
+const DISHES=[
+{id:'gbjd',name:'宫保鸡丁',cz:'川菜',eat:'all',fin:'pot',desc:'煳辣荔枝味：干辣椒花椒炸至棕红，碗汁糖醋比例近 1:1。',steps:[
+ a('A','jt',300,'丁'),a('A','salt',1.5),a('A','ls',5),a('A','lj',5),a('A','dian',5),
+ a('B','bt',14),a('B','xc',15),a('B','ls',10),a('B','salt',.5),a('B','dian',4),a('B','qs',30),r(600),
+ a('pot','cy',35),h(3,35),a('pot','gla',8),a('pot','hj',2),h(1,25),p('A'),h(3,70),
+ a('pot','cong',30,'段'),a('pot','jiang',6),a('pot','suan',10),h(3,25),p('B'),h(3,20),a('pot','hs',40)]},
+{id:'yxrs',name:'鱼香肉丝',cz:'川菜',eat:'all',fin:'pot',desc:'鱼香味：泡椒、葱姜蒜、糖醋，无鱼而有鱼香。',steps:[
+ a('A','lji',250,'丝'),a('A','salt',1.5),a('A','lj',5),a('A','dian',6),
+ a('B','bt',15),a('B','xc',16),a('B','ls',10),a('B','dian',3),a('B','qs',30),r(600),
+ a('pot','cy',40),h(3,40),p('A'),h(3,45),a('pot','pj',25),h(2,30),a('pot','jiang',8),a('pot','suan',12),h(2,20),
+ a('pot','mr',60,'丝'),a('pot','hlb',60,'丝'),h(3,60),p('B'),h(3,20),a('pot','cong',15)]},
+{id:'mpdf',name:'麻婆豆腐',cz:'川菜',eat:'all',fin:'pot',desc:'麻辣烫嫩酥香：豆瓣炒出红油，三次勾芡，出锅撒花椒面。',steps:[
+ a('C','dfu',400,'块','blanch'),a('pot','cy',45),h(2,40),a('pot','rm',80,'末'),h(3,70),a('pot','db',25),h(1,90),
+ a('pot','ds',6),a('pot','ljm',4),a('pot','jiang',5),a('pot','suan',8),h(1,30),a('pot','gt',200),p('C'),h(3,60),
+ a('pot','ls',5),a('pot','bt',2),h(2,240),a('pot','dian',8),h(2,40),a('pot','sm',30),h(2,15),a('pot','hjm',2)]},
+{id:'hgr',name:'回锅肉',cz:'川菜',eat:'all',fin:'pot',desc:'家常味：煮熟的五花片煸成灯盏窝，豆瓣甜面酱炒香。',steps:[
+ a('pot','wh',300,'片','preboil'),a('pot','cy',10),h(2,180),a('pot','db',15),h(1,60),a('pot','tmj',8),a('pot','ds',4),h(1,20),
+ a('pot','bt',3),a('pot','ls',3),a('pot','sm',120),h(3,60)]},
+{id:'hsr',name:'红烧肉',cz:'本帮/湘',eat:'all',fin:'pot',desc:'炒糖色上色，加热水小火慢炖一小时，大火收汁。',steps:[
+ a('C','wh',500,'块','blanch'),a('pot','cy',10),a('pot','bingt',25),h(1,210),p('C'),h(2,90),
+ a('pot','lj',20),h(3,20),a('pot','ls',20),a('pot','lc',8),a('pot','jiang',12),a('pot','cong',20,'段'),a('pot','bj',4),a('pot','gp',3),a('pot','xy',.6),
+ a('pot','rs',450),h(3,120),h(1,3600,1),h(3,330)]},
+{id:'tcpg',name:'糖醋排骨',cz:'江浙',eat:'all',fin:'pot',desc:'排骨焯水煎香，糖醋酱油焖软后大火收汁。',steps:[
+ a('pot','pg',500,'块','blanch'),a('pot','hsy',25),h(2,240),a('pot','lj',15),a('pot','jiang',8),h(3,15),
+ a('pot','ls',15),a('pot','lc',3),a('pot','bt',40),a('pot','xc',30),a('pot','rs',400),h(3,120),h(1,2400,1),a('pot','xc',10),h(3,420),a('pot','zm',4)]},
+{id:'szy',name:'水煮鱼',cz:'川菜',eat:'drain',fin:'C',desc:'豆瓣炒香熬汤，鱼片上浆氽熟，最后泼滚油激出辣椒花椒香。',steps:[
+ a('A','yu',400,'片'),a('A','salt',3),a('A','lj',10),a('A','jdq',15),a('A','dian',8),r(900),
+ a('pot','cy',40),h(2,30),a('pot','db',35),h(1,90),a('pot','jiang',10),a('pot','suan',10),a('pot','gla',4),h(1,20),a('pot','gt',800),h(3,240),
+ a('pot','qcai',200),h(3,60),p('A'),h(3,60),a('pot','salt',3),p('pot','C'),
+ a('C','ljm',8),a('C','hjm',2),a('C','suan',12),a('C','gla',8),a('C','hj',4),a('pot','cy',80),h(3,60),p('pot','C')]},
+{id:'lzj',name:'辣子鸡',cz:'川渝',eat:'all',fin:'pot',desc:'鸡丁炸干，大量干辣椒花椒炒出煳辣香，在辣椒里找鸡。',steps:[
+ a('A','jt',400,'丁'),a('A','salt',3),a('A','lj',10),a('A','ls',5),a('A','jiang',5),r(900),
+ a('pot','cy',600),h(3,120),p('A'),h(3,240),dr('pot','oil',50),h(2,10),a('pot','gla',40),a('pot','hj',10),a('pot','jiang',8),a('pot','suan',12),h(2,60),
+ a('pot','bt',3),a('pot','jj',2),a('pot','zm',6),a('pot','cong',10),h(3,15)]},
+{id:'fqcd',name:'番茄炒蛋',cz:'家常',eat:'all',fin:'pot',desc:'蛋先炒至凝固盛出，番茄炒出汁，糖盐调和回锅。',steps:[
+ a('A','jd',200,'液'),a('A','salt',1),a('pot','hsy',35),h(3,30),p('A'),h(3,35),p('pot','C','foods'),
+ a('pot','hsy',10),h(3,10),a('pot','fq',300,'块'),h(3,140),a('pot','bt',8),a('pot','salt',2.5),p('C'),h(2,30),a('pot','cong',8)]},
+{id:'qzly',name:'清蒸鲈鱼',cz:'粤菜',eat:'all',fin:'C',desc:'姜葱料酒腌后大火蒸 8 分钟，倒掉蒸汁，淋豉油泼热油。',steps:[
+ a('pot','yu',500,'整条'),a('pot','jiang',12),a('pot','cong',15,'段'),a('pot','lj',10),r(300),h(3,480,0,'steam'),dr('pot','water',0),
+ p('pot','C'),a('C','ls',20),a('C','bt',3),a('C','cong',15),a('pot','hsy',25),h(3,60),p('pot','C')]},
+{id:'cbyr',name:'葱爆羊肉',cz:'鲁/京',eat:'all',fin:'pot',desc:'大火、热油、葱多，十几秒一个阶段，烹醋压膻。',steps:[
+ a('A','yr',300,'片'),a('A','ls',10),a('A','lj',8),a('A','bhj',1),a('A','dian',4),r(600),
+ a('pot','hsy',35),h(3,45),p('A'),h(3,40),a('pot','cong',150,'段'),h(3,35),a('pot','xc',4),a('pot','salt',1),h(3,8),a('pot','xyou',4)]},
+{id:'zrrp',name:'孜然羊肉',cz:'西北',eat:'all',fin:'pot',desc:'羊肉煸干出焦香，孜然辣椒面遇热油爆香。',steps:[
+ a('A','yr',300,'片'),a('A','salt',2),a('A','lj',8),a('A','dian',4),r(600),
+ a('pot','hsy',40),h(3,45),p('A'),h(3,120),a('pot','yc',100),h(3,40),a('pot','zr',8),a('pot','ljm',4),a('pot','salt',1.5),h(2,20),a('pot','xcai',15)]},
+{id:'slts',name:'酸辣土豆丝',cz:'家常',eat:'all',fin:'pot',desc:'干辣椒花椒炝锅，大火快炒保持爽脆，沿锅边烹醋。',steps:[
+ a('pot','cy',30),h(3,35),a('pot','gla',8),a('pot','hj',1.5),h(2,15),a('pot','td',400,'丝'),h(3,110),
+ a('pot','bc',15),a('pot','salt',4),h(3,15),a('pot','jj',1.5),a('pot','cong',10)]},
+{id:'klk',name:'可乐鸡翅',cz:'家常',eat:'all',fin:'pot',desc:'鸡翅煎至两面金黄，可乐代糖焖煮，收汁至黏稠。',steps:[
+ a('pot','jc',500,'整','blanch'),a('pot','hsy',15),h(2,240),a('pot','jiang',8),a('pot','lj',10),h(3,15),
+ a('pot','ls',20),a('pot','lc',5),a('pot','kl',330),h(3,90),h(2,900,1),h(3,330)]},
+{id:'lnr',name:'五香卤牛肉',cz:'北方',eat:'drain',fin:'pot',desc:'牛腱焯水，十余种香料卤水小火两小时，再浸泡入味。',steps:[
+ a('pot','nn',800,'大块','blanch'),a('pot','qs',2000),a('pot','ls',45),a('pot','lc',15),a('pot','bingt',20),a('pot','salt',15),a('pot','huj',30),
+ a('pot','bj',6),a('pot','gp',5),a('pot','xy',1),a('pot','cg',4),a('pot','hj',3),a('pot','gla',4),a('pot','xhx',3),a('pot','dx',.4),a('pot','cp',3),a('pot','jiang',20),a('pot','cong',30,'段'),
+ h(3,300),h(1,6600,1),r(3600,1)]},
+{id:'gbdj',name:'干煸四季豆',cz:'川菜',eat:'all',fin:'pot',desc:'中火把四季豆煸到起虎皮、彻底熟透，再下肉末芽菜干辣椒。',steps:[
+ a('pot','cy',35),h(3,30),a('pot','dou',400,'段'),h(2,420),a('pot','rm',60,'末'),h(3,60),a('pot','gla',6),a('pot','hj',2),a('pot','suan',10),h(2,25),
+ a('pot','salt',3),a('pot','ls',5),a('pot','bt',2),h(3,15)]},
+{id:'yxqz',name:'鱼香茄子',cz:'川菜',eat:'all',fin:'pot',desc:'茄子先煎软（会吸油），再与泡椒鱼香汁烧入味。',steps:[
+ a('B','bt',15),a('B','xc',15),a('B','ls',12),a('B','dian',4),a('B','qs',60),
+ a('pot','cy',50),h(3,40),a('pot','qz',400,'条'),h(2,240),p('pot','C','foods'),a('pot','cy',20),h(2,20),a('pot','pj',20),a('pot','db',8),h(1,40),a('pot','jiang',6),a('pot','suan',15),h(2,20),p('C'),p('B'),h(3,60),a('pot','cong',15)]},
+{id:'jjrs',name:'京酱肉丝',cz:'京菜',eat:'all',fin:'pot',desc:'甜面酱小火炒香，肉丝滑熟裹酱，配葱丝。',steps:[
+ a('A','lji',250,'丝'),a('A','salt',1),a('A','lj',5),a('A','jdq',15),a('A','dian',5),r(600),
+ a('pot','hsy',40),h(3,30),p('A'),h(3,45),p('pot','C','foods'),a('pot','tmj',25),a('pot','bt',6),a('pot','qs',20),h(1,60),
+ p('C'),h(2,25),a('pot','xyou',3),a('pot','cong',40)]},
+{id:'scy',name:'酸菜鱼',cz:'川菜',eat:'drain',fin:'C',desc:'酸菜炒香煮出酸汤，鱼片滑入，泼油激香。',steps:[
+ a('A','yu',400,'片'),a('A','salt',3),a('A','lj',10),a('A','jdq',15),a('A','dian',8),r(900),
+ a('pot','zy',30),h(2,30),a('pot','jiang',10),a('pot','suan',10),a('pot','pj',20),h(2,20),a('pot','scai',200),h(3,90),a('pot','qs',800),h(3,420),
+ p('A'),h(3,70),a('pot','salt',2),a('pot','bhj',1),a('pot','bc',8),
+ p('pot','C'),a('C','gla',6),a('C','hj',3),a('C','suan',8),a('C','cong',10),a('pot','cy',40),h(3,70),p('pot','C')]},
+];
+
+// ===== 香料调配引擎 =====
+const NOTES=[['anise','茴香甘甜'],['cinna','桂皮木香'],['warm','温辛'],['citrus','柑橘清香'],['cool','樟凉'],['floral','花香'],['herbal','药草香'],['root','根土香'],['seed','籽香'],['roast','焙烤焦香'],['pungent','辛辣'],['spicy','辣'],['numb','麻'],['sweet','回甘'],['bitter','苦涩']];
+// 挥发性（每分钟沸煮损失）：前调高、中调中、后调低
+const VOL={cool:.03,citrus:.025,floral:.02,pungent:.01,seed:.008,anise:.005,cinna:.005,warm:.005,herbal:.004,root:.003,roast:.004,numb:.004,spicy:0,sweet:0,bitter:0};
+const LAYER={cool:'前调',citrus:'前调',floral:'前调',pungent:'前调',anise:'中调',cinna:'中调',warm:'中调',seed:'中调',numb:'中调',spicy:'中调',herbal:'后调',root:'后调',roast:'后调',sweet:'后调',bitter:'后调'};
+const SPX={};
+function X(id,name,n,o){SPX[id]=Object.assign({id,name,n,kW:.03,kO:.012,win:[110,160],okMin:120,ob:.05,burnT:180,max:5,role:'辅香',tip:'',col:null},o)}
+X('bj','八角',{anise:3,sweet:.3,warm:.3},{okMin:120,ob:.03,max:8,role:'主香',tip:'卤、红烧的骨架香；多了发甜发闷'});
+X('gp','桂皮',{cinna:2.6,sweet:.3,bitter:.12},{okMin:60,ob:.2,max:6,role:'主香',tip:'木质暖香；久煮出涩，用量是八角的一半左右'});
+X('xy','香叶',{herbal:1.5,cool:.8,floral:.3},{okMin:40,ob:.4,max:1.5,role:'辅香',tip:'1 片约 0.3g，40 分钟后捞出，否则发苦'});
+X('cg','草果',{cool:1.6,root:.8,pungent:.6,roast:.2},{okMin:90,ob:.2,max:5,role:'去腥',tip:'压牛羊膻味的主力，需拍破去籽减苦'});
+X('dx','丁香',{warm:4,numb:.3,bitter:.2},{okMin:60,ob:.5,max:.8,role:'增香',tip:'味极霸道，每公斤肉不超过 1 克'});
+X('xhx','小茴香',{anise:1.5,seed:1,sweet:.2},{okMin:120,max:5,role:'辅香',tip:'和八角同属茴香调，更清淡带籽香；压羊膻'});
+X('hj','红花椒',{numb:3,citrus:.6,warm:.4},{kO:.02,okMin:90,ob:.1,burnT:170,max:8,role:'麻',tip:'油温超 170°C 发黑发苦'});
+X('qhj','青花椒',{numb:3.3,citrus:1.5,floral:.4},{kO:.025,okMin:40,ob:.12,burnT:160,max:8,role:'麻',tip:'清香型麻，怕高温久煮'});
+X('cp','陈皮',{citrus:1.4,sweet:.3,bitter:.3,herbal:.3},{okMin:180,ob:.03,max:10,role:'调和',tip:'理气解腻，适合牛肉、鸭、红豆沙'});
+X('bz','白芷',{root:2,herbal:1.2,bitter:.3},{okMin:90,ob:.3,max:3,role:'去腥',tip:'增香去腥，多了有明显药味'});
+X('sn','山奈(沙姜)',{root:1.5,cool:1,pungent:.8,floral:.4},{max:4,role:'增香',tip:'粤式白卤、盐焗鸡的灵魂'});
+X('glj','高良姜(南姜)',{pungent:1.6,root:1,cool:.5},{max:6,role:'增香',tip:'潮汕卤水的主香'});
+X('bk','白豆蔻',{cool:2,citrus:.6,floral:.5},{max:3,role:'增香',tip:'清凉芳香，去异味；香气易散'});
+X('cdk','草豆蔻',{cool:1.2,root:.6,herbal:.4},{max:3,role:'去腥',tip:'暖胃去腥，常用于火锅底料'});
+X('sr','砂仁',{cool:1.8,citrus:.5,herbal:.5},{max:3,role:'增香',tip:'樟凉带柑橘，酱牛肉常用'});
+X('rdk','肉豆蔻',{warm:2.2,sweet:.3,bitter:.2},{max:1.5,role:'增香',tip:'含肉豆蔻醚，大量食用有毒性，务必少放'});
+X('gc','甘草',{sweet:2,herbal:.3},{okMin:180,ob:0,max:4,role:'回甘',tip:'调和诸香、回甘；多了发甜发腻'});
+X('bb','荜拨',{pungent:2,warm:.6},{max:3,role:'增香',tip:'胡椒近亲，辛辣带温香'});
+X('xm','香茅',{citrus:2,floral:.5},{max:5,role:'增香',tip:'柠檬样清香，东南亚与粤式常用'});
+X('gs','甘松',{herbal:1.6,root:.8,floral:.3,bitter:.1},{max:2,role:'辅香',tip:'带特殊药香，火锅底料常见'});
+X('pc','排草/灵草',{herbal:1.2,floral:.8},{max:2,role:'辅香',tip:'卤水用的草本香'});
+X('jlx','九里香',{floral:1.2,herbal:.5},{max:2,role:'辅香',tip:'花香型，卤水点缀'});
+X('zr','孜然',{seed:3,roast:.4,warm:.3},{kO:.03,burnT:178,max:15,role:'主香',tip:'遇热油或焙香才出味'});
+X('yzz','芫荽籽',{seed:1.5,citrus:1,floral:.4},{max:8,role:'辅香',tip:'柑橘籽香，咖喱底料'});
+X('bhj','白胡椒',{pungent:3,warm:.3},{okMin:20,ob:.1,max:4,role:'辛辣',tip:'香气易散，粉末后放'});
+X('hhj','黑胡椒',{pungent:2.2,warm:.8,roast:.3},{max:5,role:'辛辣',tip:'比白胡椒更香更粗犷'});
+X('gla','干辣椒',{spicy:2.5,roast:.6},{kO:.02,win:[115,160],burnT:178,max:40,role:'辣',tip:'油炒成棕红有煳辣香，发黑即苦',col:'red'});
+X('gj','干姜',{pungent:2,warm:.5},{max:5,role:'辛辣',tip:'去腥暖身，炖羊肉常用'});
+X('jh','姜黄',{root:.8,bitter:.3},{max:5,role:'调色',tip:'咖喱黄色来源，味道微苦土香',col:'yellow'});
+X('zc','紫草',{root:.2},{max:3,role:'调色',tip:'油溶性红色，几乎无味',col:'red'});
+X('zz','栀子',{bitter:.25},{max:3,role:'调色',tip:'水溶性黄色',col:'yellow'});
+X('lhg','罗汉果',{sweet:2.5},{okMin:240,ob:0,max:3,role:'回甘',tip:'清甜，替代部分糖'});
+X('dg','当归',{herbal:2.5,sweet:.3,bitter:.3},{max:3,role:'药香',tip:'药膳炖汤，香气浓烈'});
+X('gzh','桂枝',{cinna:1,herbal:.3},{max:5,role:'辅香',tip:'比桂皮温和'});
+X('zm','白芝麻',{roast:1.2,sweet:.2},{burnT:190,max:20,role:'增香',tip:'焙香后研磨香气最足'});
+const SCATS={'主香':['bj','gp','zr','xhx'],'去腥':['cg','bz','cdk','gj','xy'],'增香':['dx','sn','glj','bk','sr','rdk','bb','xm','zm'],'清香':['cp','xm','qhj','yzz','bk'],'药草':['gs','pc','jlx','dg','gzh','bz'],'麻辣':['hj','qhj','gla','bhj','hhj'],'回甘调色':['gc','lhg','jh','zc','zz']};
+const METHODS={powder:'研磨成粉直接用（腌/拌/撒）',roast:'干锅焙香后研磨',oil:'热油炸香（炒底料）',water:'炖煮/卤（整粒下水）'};
+
+// 计算单一时刻的香气
+function blendAt(items,m){
+  // items:[{id,g}]  m:{method,kg,oilT,sec,min,lid,form}
+  const N={};for(const [k] of NOTES)N[k]=0;const per={};let burnMax=0;const kg=Math.max(.1,+m.kg||1);const col={red:0,yellow:0};
+  for(const it of items){const d=SPX[it.id];if(!d||!(it.g>0))continue;const g=it.g/kg;let rel=1,keep={},burn=0,extra={},bit=0;
+    for(const [k] of NOTES)keep[k]=1;
+    if(m.method==='powder'){rel=1}
+    else if(m.method==='roast'){rel=1;for(const k of['cool','citrus','floral'])keep[k]=.75;extra.roast=.18*Object.values(d.n).reduce((a,b)=>a+b,0);bit=.02}
+    else if(m.method==='oil'){const T=+m.oilT||140,s=m.sec==null?60:+m.sec;const fT=clamp((T-100)/60,0,1.5);const k=d.kO*(m.form==='powder'?4:1);rel=1-Math.exp(-k*s*fT);
+      for(const kk in VOL)keep[kk]=Math.exp(-VOL[kk]*s/60*Math.max(0,(T-60)/60)*2);
+      if(T>d.burnT){burn=1-Math.exp(-.05*(T-d.burnT)/20*s*(m.form==='powder'?2:1))}
+      if(T>125)extra.roast=Math.min(1,(T-125)/50)*Math.min(1,s/90)*.25*Object.values(d.n).reduce((a,b)=>a+b,0)*(1-burn)}
+    else if(m.method==='water'){const t=m.min==null?60:+m.min;const k=d.kW*(m.form==='powder'?4:1);rel=1-Math.exp(-k*t);
+      for(const kk in VOL)keep[kk]=Math.exp(-VOL[kk]*t*(m.lid?.3:1));
+      if(d.okMin&&d.ob)bit=d.ob*clamp((t*(m.form==='powder'?1.6:1)-d.okMin)/d.okMin,0,2)}
+    const contrib={};
+    for(const k in d.n){const v=g*d.n[k]*rel*keep[k]*(1-burn);contrib[k]=v}
+    for(const k in extra)contrib[k]=(contrib[k]||0)+g*extra[k];
+    if(burn>0){contrib.bitter=(contrib.bitter||0)+g*2.5*burn;contrib.roast=(contrib.roast||0)+g*.5*burn}
+    if(bit)contrib.bitter=(contrib.bitter||0)+g*bit*1.6;
+    for(const k in contrib)N[k]+=contrib[k];per[it.id]=contrib;burnMax=Math.max(burnMax,burn);
+    if(d.col)col[d.col]+=g*(m.method==='water'?rel:1)}
+  return finishNotes(N,per,burnMax,col)}
+function finishNotes(N,per,burnMax,col){
+  // 感知：回甘压苦，辣麻掩盖细香
+  const raw=Object.assign({},N);
+  N.bitter*=1-.35*Math.min(1,N.sweet/6);
+  const heat=N.spicy*.5+N.numb*.3;for(const k of['floral','citrus','herbal','cool'])N[k]*=1-.3*Math.min(1,heat/12);
+  const D={};for(const [k] of NOTES)D[k]=+(10*(1-Math.exp(-N[k]/9))).toFixed(2);
+  return{D,N,raw,per,burnMax,col}}
+
+function blendInfo(items,m){return decorate(blendAt(items,m))}
+function decorate(r){const tot={};let all=0;
+  for(const id in r.per){const v=Object.entries(r.per[id]).filter(([k])=>k!=='bitter').reduce((a,[,b])=>a+b,0);tot[id]=v;all+=v}
+  const share=Object.entries(tot).map(([id,v])=>[id,all?v/all:0]).sort((a,b)=>b[1]-a[1]);
+  const top=NOTES.map(([k,n])=>[k,n,r.D[k]]).filter(x=>x[0]!=='bitter').sort((a,b)=>b[2]-a[2]);
+  const layers={'前调':[],'中调':[],'后调':[]};for(const [k,n,v] of top)if(v>=1.2)layers[LAYER[k]].push([n,v]);
+  const aroma=top.reduce((a,x)=>a+x[2],0);
+  return Object.assign(r,{share,top,layers,aroma})}
+
+// 时间曲线：总香气与苦涩
+function blendCurve(items,m){const pts=[];
+  if(m.method==='water'){const T=Math.max(120,(+m.min||60)*1.6);for(let t=0;t<=T;t+=Math.max(1,Math.round(T/80))){const r=blendAt(items,Object.assign({},m,{min:t}));pts.push([t,sumAroma(r.D),r.D.bitter])}return{pts,unit:'分钟'}}
+  if(m.method==='oil'){const T=Math.max(180,(+m.sec||60)*1.6);for(let t=0;t<=T;t+=Math.max(2,Math.round(T/80))){const r=blendAt(items,Object.assign({},m,{sec:t}));pts.push([t,sumAroma(r.D),r.D.bitter])}return{pts,unit:'秒'}}
+  return null}
+function sumAroma(D){let s=0;for(const [k] of NOTES)if(k!=='bitter'&&k!=='spicy'&&k!=='numb')s+=D[k];return s}
+function bestTime(curve){let best=null;for(const [t,a,b] of curve.pts){const sc=a-2.2*b;if(!best||sc>best[1]+.05)best=[t,sc]}return best?best[0]:0}
+
+// 经典复合香料
+const BLENDS=[
+ {id:'wxf',name:'五香粉',m:{method:'powder',kg:1},it:{bj:3,gp:2,xhx:2,dx:.5,hj:1.5},dishes:['五香熏鱼','粉蒸肉','五香卤蛋','五香花生','五香牛肉'],use:'腌肉每公斤 3–5g，或出锅前撒'},
+ {id:'ssx',name:'十三香',m:{method:'powder',kg:1},it:{bj:2,gp:1.5,xhx:1.5,hj:1.5,dx:.3,sr:.5,bk:.5,cg:.5,rdk:.3,sn:.5,bz:.5,gj:.5,cp:.5},dishes:['十三香小龙虾','饺子/包子馅','卤肉','家常炖菜'],use:'馅料每公斤 3–5g'},
+ {id:'hl',name:'川式红卤',m:{method:'water',kg:1,min:120,lid:1},it:{bj:5,gp:3,xy:1,cg:3,xhx:2,hj:3,gla:4,dx:.5,cp:2,bz:1,sn:1,gc:1},dishes:['卤牛肉','卤猪蹄','卤鸡爪','卤豆干','卤藕'],use:'每 2L 卤水配 1kg 料，小火卤 1–2 小时'},
+ {id:'bl',name:'粤式白卤/沙姜',m:{method:'water',kg:1,min:40,lid:1},it:{sn:4,bj:2,gc:1,cg:1,xy:.5,cp:1,gp:1},dishes:['白卤鸡','盐焗鸡','沙姜猪手','白切鸡蘸料'],use:'浸卤 30–40 分钟后关火浸泡'},
+ {id:'cs',name:'潮汕卤水',m:{method:'water',kg:1,min:90,lid:1},it:{glj:6,bj:3,gp:3,gc:2,dx:.5,xm:2,cp:2,hj:1},dishes:['潮汕卤鹅','卤水拼盘','卤大肠'],use:'南姜为主，配老抽冰糖'},
+ {id:'hg',name:'火锅/麻辣香料',m:{method:'oil',kg:1,oilT:130,sec:600,form:'whole'},it:{bj:3,gp:2,xy:1,cg:2,xhx:2,bk:1.5,sr:1,sn:1.5,dx:.3,gs:.5,hj:8,gla:30},dishes:['重庆火锅','冒菜','麻辣香锅','水煮肉片','毛血旺'],use:'牛油小火慢炒 10–20 分钟'},
+ {id:'xj',name:'新疆烧烤料',m:{method:'roast',kg:1},it:{zr:15,gla:6,yzz:2,zm:3,hhj:1},dishes:['羊肉串','孜然羊肉','烤茄子','烤馕','烤鸡翅'],use:'烤至七成熟时撒，每串约 1g'},
+ {id:'db',name:'东北炖肉料',m:{method:'water',kg:1,min:60,lid:1},it:{bj:3,gp:2,xy:1,hj:2,gj:1},dishes:['小鸡炖蘑菇','猪肉炖粉条','酸菜白肉','排骨炖豆角'],use:'整粒入锅，炖 1 小时'},
+ {id:'ys',name:'羊肉去膻料',m:{method:'water',kg:1,min:90,lid:0},it:{cg:4,bz:1.5,xhx:2,cp:2,hj:2,sr:1,gj:2},dishes:['清炖羊肉','羊蝎子','手抓羊肉','羊肉汤'],use:'先开盖炖 20 分钟散膻，再加盖'},
+ {id:'jn',name:'北京酱牛肉料',m:{method:'water',kg:1,min:150,lid:1},it:{bj:4,gp:3,hj:2,xhx:3,dx:.5,bz:1,sr:1,cg:2,cp:1},dishes:['酱牛肉','酱肘子','酱猪蹄'],use:'配黄酱，小火 2.5 小时'},
+ {id:'gl',name:'中式咖喱底料',m:{method:'oil',kg:1,oilT:130,sec:60,form:'powder'},it:{jh:4,yzz:4,zr:2,hhj:1,gj:1,gp:1,dx:.2,xhx:1,gla:1},dishes:['咖喱鸡','咖喱牛腩','咖喱鱼蛋','咖喱土豆'],use:'小火油炒 1 分钟出香再加汤'},
+ {id:'hs',name:'红烧香料',m:{method:'water',kg:1,min:60,lid:1},it:{bj:2,gp:1.5,xy:.5},dishes:['红烧肉','红烧排骨','红烧牛腩','红烧鸡块'],use:'少而精，突出酱香糖色'},
+ {id:'lr',name:'腊肉腌料',m:{method:'powder',kg:1},it:{hj:4,bj:1,gp:1,bhj:1},dishes:['四川腊肉','腊肠','咸肉'],use:'配盐 30–40g/kg 干腌 5–7 天'},
+ {id:'yt',name:'药膳炖汤料',m:{method:'water',kg:1,min:90,lid:1},it:{dg:3,gc:1,cp:1,gj:1,lhg:.5},dishes:['当归羊肉汤','药膳鸡汤','当归鸭'],use:'清汤小火 1.5 小时'},
+ {id:'tj',name:'藤椒/青花椒风味',m:{method:'oil',kg:1,oilT:120,sec:30},it:{qhj:8,xm:1},dishes:['藤椒鸡','青花椒鱼','藤椒钵钵鸡'],use:'低油温淋泼，保持清香'},
+];
+function vecOf(D){return NOTES.map(([k])=>D[k])}
+function cos(a,b){let s=0,x=0,y=0;for(let i=0;i<a.length;i++){s+=a[i]*b[i];x+=a[i]*a[i];y+=b[i]*b[i]}return x&&y?s/Math.sqrt(x*y):0}
+const blendCache={};
+function blendProfile(b){if(!blendCache[b.id]){const items=Object.entries(b.it).map(([id,g])=>({id,g}));blendCache[b.id]=blendInfo(items,b.m)}return blendCache[b.id]}
+function matchBlends(info){const v=vecOf(info.D);return BLENDS.map(b=>{const p=blendProfile(b);const c=cos(v,vecOf(p.D));const ia=info.aroma,ib=p.aroma;const ratio=ia&&ib?Math.min(ia,ib)/Math.max(ia,ib):0;
+  return{b,score:Math.round(100*Math.max(0,c)*(.8+.2*ratio)),c}}).sort((a,b)=>b.score-a.score)}
+// 规则：按主导香型推荐食材与菜
+function dishRules(info){const D=info.D,R=[];const s=(k)=>D[k]||0;
+  if(s('anise')+s('cinna')>9)R.push(['猪肉、牛腩红烧或卤','茴桂暖香和酱油糖色最搭']);
+  if(s('cool')+s('root')>7)R.push(['牛羊肉炖煮','樟凉与根土香压膻去腥']);
+  if(s('seed')>4)R.push(['烧烤、干煸、烤羊肉','籽香需要高温油脂激发']);
+  if(s('citrus')+s('floral')>5)R.push(['禽类、鱼、白卤','清香型怕重酱色，宜清淡做法']);
+  if(s('numb')>4&&s('spicy')>4)R.push(['火锅、水煮、麻辣香锅','麻辣为主的川渝做法']);
+  else if(s('numb')>4)R.push(['椒麻鸡、腊肉、花椒鸡','突出麻香']);
+  if(s('herbal')>4)R.push(['炖汤、药膳','药草香适合长时间清炖']);
+  if(s('pungent')>4)R.push(['汤、羊肉、腌料','辛辣去腥暖身']);
+  if(s('roast')>4)R.push(['撒料、蘸碟','焙烤香适合最后撒']);
+  if(!R.length)R.push(['清淡炖菜或蘸料','香气较轻，可加量或换主香']);
+  return R.slice(0,4)}
+function blendWarnings(items,m,info){const W=[];const kg=Math.max(.1,+m.kg||1);let tot=0;
+  for(const it of items){const d=SPX[it.id];if(!d)continue;if(!['gla','hj','qhj','zm'].includes(it.id))tot+=it.g;const per=it.g/kg;
+    if(per>d.max*1.3)W.push([2,`${d.name}每公斤 ${per.toFixed(1)}g，超过常用上限约 ${d.max}g：${d.tip}`]);
+    else if(per>d.max)W.push([1,`${d.name}偏多（${per.toFixed(1)}g/kg，常用 ≤${d.max}g）。`]);
+    if(m.method==='water'&&d.okMin&&d.ob>=.15&&(+m.min||0)>d.okMin*1.2)W.push([1,`${d.name}煮 ${m.min} 分钟会出苦涩，约 ${d.okMin} 分钟后捞出。`]);
+    if(m.method==='oil'&&(+m.oilT||0)>d.burnT)W.push([2,`油温 ${m.oilT}°C 超过${d.name}的焦化点（约 ${d.burnT}°C），会发黑发苦。`]);
+    if(it.id==='rdk'&&per>1.5)W.push([2,'肉豆蔻用量过大可能引起不适，请减少。'])}
+  const tp=tot/kg;const lim=m.method==='powder'||m.method==='roast'?[2,30]:[3,40];
+  if(items.length&&tp<lim[0])W.push([0,`香料总量（不含辣椒花椒）${tp.toFixed(1)}g/kg 偏轻，香气可能不明显。`]);
+  if(tp>lim[1])W.push([1,`香料总量（不含辣椒花椒）${tp.toFixed(1)}g/kg 偏重，容易药味盖过肉香。`]);
+  if(info.share.length>2&&info.share[0][1]>.6)W.push([0,`${SPX[info.share[0][0]].name}占了 ${Math.round(info.share[0][1]*100)}% 的香气，其他香料几乎被盖住。`]);
+  if(info.D.bitter>3)W.push([2,`苦涩明显（${info.D.bitter.toFixed(1)}）：检查焦化、久煮或苦味香料用量。`]);
+  if(m.method==='powder'&&items.some(i=>['zr','zm'].includes(i.id)))W.push([0,'孜然、芝麻生粉香气弱，焙香后研磨更香。']);
+  const seen=new Set();return W.filter(w=>!seen.has(w[1])&&seen.add(w[1]))}
+function describe(info){const t=info.top.filter(x=>x[2]>=1.2);if(!t.length)return'香气很淡。';
+  const w=v=>v>7?'浓郁的':v>4.5?'明显的':'淡淡的';let s=`以${w(t[0][2])}${t[0][1]}为主调`;
+  if(t[1])s+=`，${t[1][1]}${t[2]?'与'+t[2][1]:''}托底`;const fr=t.slice(3).filter(x=>LAYER[x[0]]==='前调');if(fr.length)s+=`，${fr.map(x=>x[1]).join('、')}提亮`;
+  if(info.D.bitter>2)s+='，尾韵带苦';else if(info.D.sweet>3)s+='，回口带甘';return s+'。'}
+// 转成模拟器调料
+function blendToSeasoning(name,items,m,info){
+  const kg=Math.max(.1,+m.kg||1);const tg=items.reduce((a,i)=>a+(+i.g||0),0);if(!tg)return null;
+  const per={};const pw=blendAt(items,{method:'powder',kg:1}).raw;for(const k in pw)per[k]=pw[k]/tg;
+  const ar=['anise','cinna','warm','cool','floral','herbal','root','seed','pungent'].reduce((a,k)=>a+per[k],0);
+  const aroO={spice:ar*.33,numb:per.numb*.37,spicy:per.spicy*.09,fresh:per.citrus*.25+per.floral*.1,roast:per.roast*.2,sweet:per.sweet*.02};
+  const powder=m.method==='powder'||m.method==='roast';
+  const okMins=items.map(i=>SPX[i.id]).filter(d=>d&&d.ob>=.15).map(d=>d.okMin);
+  return{name:'自配·'+name,cat:'香料',aroO,raw:powder?{spice:ar*.12}:{},rOil:powder?.05:.005,win:[100,155],rWater:powder?.005:.0007,burnT:powder?165:180,bBit:.3,vol:powder?.0004:.00015,whole:powder?0:1,okMin:okMins.length?Math.min(...okMins):0,ob:okMins.length?.15:0,items:items.map(i=>({id:i.id,g:i.g/kg})),def:Math.round(tg/kg*.5*10)/10,note:`自配复合香料（${items.length} 种）：${describe(info)}`}}
+
+// ===== 锅里的香料 → 复合香味 =====
+// 模拟器调料 id → 香料库 id（系数=每克相当于多少克该香料）
+const IT2SPX={bj:[['bj',1]],gp:[['gp',1]],xy:[['xy',1]],cg:[['cg',1]],dx:[['dx',1]],xhx:[['xhx',1]],cp:[['cp',1]],sn:[['sn',.6],['bz',.4]],zr:[['zr',1]],
+  hj:[['hj',1]],qhj:[['qhj',1]],gla:[['gla',1]],bhj:[['bhj',1]],hhj:[['hhj',1]],zm:[['zm',1]],ljm:[['gla',1]],hjm:[['hj',1]],jiang:[['gj',.05]],
+  hyou:[['gla',.25]],hjy:[['hj',.3]],tjy:[['qhj',.3]],hs:[['zm',.3]]};
+const POWDERY=new Set(['wxf','ssx','gl','ljm','hjm','bhj','hhj','zm']);
+function blendParts(id){const b=BLENDS.find(x=>x.id===id);const t=Object.values(b.it).reduce((a,v)=>a+v,0);return Object.entries(b.it).map(([k,v])=>[k,v/t])}
+function spxOf(id){if(IT2SPX[id])return IT2SPX[id];if(id==='wxf')return blendParts('wxf');if(id==='ssx')return blendParts('ssx');if(id==='gl')return blendParts('gl');
+  const d=IT[id];if(d&&d.mix&&Array.isArray(d.items)){const t=d.items.reduce((a,i)=>a+i.g,0)||1;return d.items.filter(i=>SPX[i.id]).map(i=>[i.id,i.g/t])}return null}
+function potAroma(c){
+  const mf=foodMass(c);const kg=mf>50?mf/1000:1;const N={};for(const [k] of NOTES)N[k]=0;const per={};const col={red:0,yellow:0};let burnMax=0,totalG=0,heated=0;const used=[];
+  for(const e of c.items){const parts=spxOf(e.id);if(!parts)continue;const d=IT[e.id];
+    const pw=POWDERY.has(e.id)||(d.mix&&!d.whole);
+    let eff=Math.min(1,e.ro+e.rw)*(1-e.lost);if(pw)eff+=Math.max(0,1-e.ro-e.rw)*.85*e.rawLeft;eff=Math.min(1,eff)*(1-e.burn);
+    totalG+=e.g;used.push([d.name,e.g]);if(e.ro+e.rw>.05)heated=1;burnMax=Math.max(burnMax,e.burn);
+    for(const [sid,f] of parts){const sp=SPX[sid];if(!sp)continue;const g=e.g*f/kg;const contrib={};let sum=0;
+      for(const k in sp.n){contrib[k]=g*sp.n[k]*eff;sum+=sp.n[k]}
+      if(e.ro>.05)contrib.roast=(contrib.roast||0)+g*sum*.2*Math.min(1,e.ro)*(1-e.burn);
+      if(e.burn>.02){contrib.bitter=(contrib.bitter||0)+g*2.5*e.burn;contrib.roast=(contrib.roast||0)+g*.5*e.burn}
+      if(sp.okMin&&sp.ob){const over=clamp((e.wetSec/60-sp.okMin)/sp.okMin,0,2);if(over>0)contrib.bitter=(contrib.bitter||0)+g*sp.ob*over*1.6}
+      for(const k in contrib)N[k]+=contrib[k];
+      const p=per[sid]||(per[sid]={});for(const k in contrib)p[k]=(p[k]||0)+contrib[k];
+      if(sp.col)col[sp.col]+=g*eff}}
+  if(!used.length)return null;
+  const info=decorate(finishNotes(N,per,burnMax,col));
+  const near=matchBlends(info).slice(0,3);const b0=near[0].b;const per1=Object.values(b0.it).reduce((a,v)=>a+v,0);
+  return{info,near,kg,mf,totalG,heated,used,supportKg:totalG/per1}}
+
+// ===== 三个模式共用 =====
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtT=s=>{s=Math.round(s);const m=Math.floor(s/60),x=s%60;return m?(x?`${m}分${x}秒`:`${m}分钟`):`${x}秒`};
+const clock=s=>{s=Math.round(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const DN=Object.fromEntries(DIMS.concat(NEG));
+const tgtCache={};
+function dishTarget(d){if(!d)return null;if(!tgtCache[d.id]){const s=simulate(d.steps);const e=evaluate(s,d.fin,d.eat);
+  const ids=new Set();for(const st of d.steps)if(st.t==='add')ids.add(st.id);tgtCache[d.id]={D:e.D,tex:e.tex,ids}}return tgtCache[d.id]}
+// 与经典菜比：味道 75% + 用料重合 25%
+function nearestDishes(D,steps){const mine=new Set(steps.filter(s=>s.t==='add').map(s=>s.id));
+  return DISHES.map(d=>{const T=dishTarget(d);const c=compare(D,T.D);let inter=0;for(const i of mine)if(T.ids.has(i))inter++;
+    const foodsT=[...T.ids].filter(i=>FD[i]),foodsM=[...mine].filter(i=>FD[i]);const fo=foodsT.filter(i=>mine.has(i)).length;
+    const jac=(inter/Math.max(1,new Set([...mine,...T.ids]).size))*.5+(foodsT.length?fo/foodsT.length:0)*.5;
+    return{d,flavor:c.score,ing:Math.round(jac*100),score:Math.round(c.score*.75+jac*100*.25),diffs:c.diffs}}).sort((a,b)=>b.score-a.score)}
+function radarSVG(svg,dims,D,T,opt){opt=opt||{};const W=svg.clientWidth,H=svg.clientHeight;if(!W)return;
+  const n=dims.length,cx=W/2,cy=H/2,R=Math.min(W*.34,H/2-30);const ang=i=>-Math.PI/2+i*2*Math.PI/n;
+  const pt=(i,v)=>[cx+Math.cos(ang(i))*R*Math.max(0,v)/10,cy+Math.sin(ang(i))*R*Math.max(0,v)/10];
+  let g='';for(const lv of[2.5,5,7.5,10])g+=`<polygon points="${dims.map((d,i)=>pt(i,lv).join(',')).join(' ')}" fill="none" stroke="var(--line)"/>`;
+  dims.forEach((d,i)=>{const [x,y]=pt(i,10);g+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--line)"/>`;
+    const [lx,ly]=pt(i,11.5);const anc=Math.abs(lx-cx)<8?'middle':lx>cx?'start':'end';const lab=W<420&&d[1].length>3?d[1].slice(0,2):d[1];
+    g+=`<text x="${lx}" y="${ly+5}" text-anchor="${anc}" font-size="${W<420?12:13.5}" fill="var(--ink)">${lab}</text>`});
+  if(T)g+=`<polygon points="${dims.map((d,i)=>pt(i,T[d[0]]).join(',')).join(' ')}" fill="none" stroke="var(--tgt)" stroke-width="2" stroke-dasharray="5 4"/>`;
+  const c=opt.color||'var(--red2)';
+  g+=`<polygon points="${dims.map((d,i)=>pt(i,D[d[0]]).join(',')).join(' ')}" fill="${c}" fill-opacity=".22" stroke="${c}" stroke-width="2.5" stroke-linejoin="round"/>`;
+  dims.forEach((d,i)=>{const [x,y]=pt(i,D[d[0]]);g+=`<circle cx="${x}" cy="${y}" r="3.5" fill="${c}"/>`});
+  svg.innerHTML=g}
+// 自配香料包：注册成调料
+function registerMix(id,spec){S(id,spec.name,'香料',spec);IT[id].mix=1}
+let MIXES=[];try{MIXES=JSON.parse(localStorage.getItem('tw.mixes')||'[]')}catch(e){}
+for(const m of MIXES)registerMix(m.id,m.spec);
+function saveMixes(){try{localStorage.setItem('tw.mixes',JSON.stringify(MIXES))}catch(e){}}
+
+// 香料复合香味面板（锅里只有香料或有香料时）
+function aromaPanel(box,c){const pa=potAroma(c);if(!pa){box.hidden=true;return null}box.hidden=false;const i=pa.info;const noFood=pa.mf<=50;
+  const svg=box.querySelector('svg');
+  box.querySelector('.ad').textContent=(pa.heated?'':'香料还没加热，整粒香料几乎不出味；')+describe(i);
+  box.querySelector('.al').innerHTML=Object.entries(i.layers).map(([k,v])=>`<div><b>${k}</b>${v.length?v.map(x=>`${x[0]} <span class="note">${x[1].toFixed(1)}</span>`).join('<br>'):'<span class="note">—</span>'}</div>`).join('');
+  box.querySelector('.am').innerHTML=pa.near.map((n,j)=>`<div class="ncard${j?'':' first'}"><b>${n.b.name}</b><span class="big2">${n.score}</span><span class="note">${esc(n.b.use)}</span></div>`).join('');
+  const dishes=[];const seen=new Set();for(const n of pa.near)if(n.score>=55)for(const d of n.b.dishes)if(!seen.has(d)){seen.add(d);dishes.push(d)}
+  box.querySelector('.ads').innerHTML=dishes.slice(0,8).map(d=>`<span class="tag">${esc(d)}</span>`).join('')||'<span class="note">和经典香型差别较大，参考下面的方向。</span>';
+  const R=dishRules(i).map(r=>`<li><b>${r[0]}</b>：${r[1]}</li>`);
+  if(noFood)R.push(`<li><b>用量</b>：锅里共 ${+pa.totalG.toFixed(1)}g 香料，按“${pa.near[0].b.name}”的常用比例，约够 ${pa.supportKg<.2?'不到 0.2':pa.supportKg.toFixed(1)} kg 主料。</li>`);
+  else R.push(`<li><b>当前浓度</b>：${+pa.totalG.toFixed(1)}g 香料配 ${Math.round(pa.mf)}g 食材，约 ${(pa.totalG/pa.kg).toFixed(1)}g/kg。</li>`);
+  if(pa.info.D.bitter>2.5)R.push('<li><b>注意</b>：香料已经出苦（焦糊或久煮），可减时长或降火。</li>');
+  box.querySelector('.ar').innerHTML=R.join('');
+  box._draw=()=>radarSVG(svg,NOTES,i.D,null,{color:'var(--soy)'});box._draw();
+  if(!box._ro){box._ro=new ResizeObserver(()=>box._draw&&box._draw());box._ro.observe(svg)}
+  return pa}
+const AROMA_HTML=`<h2>香料复合香味</h2><p class="ad" style="margin:0 0 4px"></p>
+ <div class="fig" style="height:280px"><svg role="img" aria-label="香气轮"></svg></div><div class="layers al"></div>
+ <h3>最像的香型</h3><div class="near am"></div><h3>适配的菜</h3><div class="tags ads"></div><ul class="hint ar"></ul>`;
+
+{
+const $=id=>document.getElementById(id);
+const CN={pot:'锅',A:'A 碗',B:'B 碗',C:'C 盘'};
+const nameOf=id=>(IT[id]||FD[id]||{name:'?'}).name;
+let st={dish:DISHES[0].id,steps:[],fin:'pot',eat:'all',custom:null};let sel=-1;const undo=[];let last=null;
+
+function loadDish(id,keep){const d=DISHES.find(x=>x.id===id);st={dish:id,steps:JSON.parse(JSON.stringify(d.steps)),fin:d.fin,eat:d.eat,custom:null};sel=-1;if(!keep)undo.length=0;full()}
+function target(){return dishTarget(DISHES.find(x=>x.id===st.dish))}
+function push(){undo.push(JSON.stringify(st));if(undo.length>60)undo.shift();$('undo').disabled=false}
+
+// 菜单
+function renderDishes(){$('dishes').innerHTML=DISHES.map(d=>`<button data-d="${d.id}" aria-pressed="${st.dish===d.id&&!st.custom}">${d.name}<small>${d.cz}</small></button>`).join('')}
+$('dishes').onclick=e=>{const b=e.target.closest('button');if(b){loadDish(b.dataset.d)}};
+
+// 步骤
+function stepHTML(s,i){
+  const ops=`<div class="ops"><button data-op="up" aria-label="上移">↑</button><button data-op="dn" aria-label="下移">↓</button><button data-op="dup" aria-label="复制">⧉</button><button data-op="del" aria-label="删除">✕</button></div>`;
+  const cSel=(k,v,opt)=>`<select data-k="${k}">${(opt||['pot','A','B','C']).map(o=>`<option value="${o}"${o===v?' selected':''}>${CN[o]}</option>`).join('')}</select>`;
+  let body='';
+  if(s.t==='add'){const f=FD[s.id];const d=IT[s.id]||f;
+    body=`<span class="unit">往</span>${cSel('c',s.c||'pot')}<span class="unit">下</span><button class="nm" data-pick="1">${esc(nameOf(s.id))}</button><input type="number" inputmode="decimal" min="0" step="${s.g<5?.5:5}" value="${s.g}" data-k="g" aria-label="用量"><span class="unit">g</span>`;
+    if(f){body+=`<select data-k="cut">${Object.keys(CUTS).map(c=>`<option${c===(s.cut||f.cut)?' selected':''}>${c}</option>`).join('')}</select><select data-k="prep"><option value=""${!s.prep?' selected':''}>直接用</option><option value="blanch"${s.prep==='blanch'?' selected':''}>先焯水</option><option value="preboil"${s.prep==='preboil'?' selected':''}>先煮熟</option></select>`}
+    if(d&&d.note)body+=`<span class="note sn">${esc(d.note)}</span>`}
+  else if(s.t==='heat'){body=`<span class="unit">锅</span><span class="seg" data-k="f">${[1,2,3].map(f=>`<button data-v="${f}" aria-pressed="${+s.f===f}">${['','小火','中火','大火'][f]}</button>`).join('')}</span><input type="number" min="1" step="5" value="${s.s}" data-k="s" aria-label="秒"><span class="unit">秒 · ${fmtT(s.s)}</span><select data-k="m"><option value="wok"${(s.m||'wok')==='wok'?' selected':''}>锅中</option><option value="steam"${s.m==='steam'?' selected':''}>隔水蒸</option><option value="bake"${s.m==='bake'?' selected':''}>烤</option></select><label><input type="checkbox" data-k="lid"${s.lid?' checked':''}>盖盖</label>`}
+  else if(s.t==='rest'){body=`<span class="unit">关火静置/腌制</span><input type="number" min="1" step="30" value="${s.s}" data-k="s"><span class="unit">秒 · ${fmtT(s.s)}</span><label><input type="checkbox" data-k="lid"${s.lid?' checked':''}>盖盖</label>`}
+  else if(s.t==='pour'){body=`<span class="unit">把</span>${cSel('from',s.from)}<span class="unit">的</span><select data-k="what"><option value="all"${s.what!=='foods'?' selected':''}>全部</option><option value="foods"${s.what==='foods'?' selected':''}>食材(盛出，汁留下)</option></select><span class="unit">倒进</span>${cSel('to',s.to||'pot')}`}
+  else if(s.t==='drain'){body=`${cSel('c',s.c||'pot')}<select data-k="kind"><option value="oil"${s.kind!=='water'?' selected':''}>沥油</option><option value="water"${s.kind==='water'?' selected':''}>倒掉汤汁</option></select><span class="unit">只留</span><input type="number" min="0" step="5" value="${s.keep}" data-k="keep"><span class="unit">g</span>`}
+  return `<li class="st k-${s.t}${i===sel?' sel':''}" data-i="${i}"><button class="when" data-op="sel" style="border:0;background:none" aria-label="在此后插入"><b>${i+1}</b><span class="tm"></span></button><div class="fl">${body}</div>${ops}</li>`}
+function renderSteps(){$('steps').innerHTML=st.steps.length?st.steps.map(stepHTML).join(''):'<li class="note" style="padding:14px">锅是空的。点“＋ 下料”开始，比如先倒油、再加热。</li>';
+  $('insHint').textContent=sel>=0?`已选中第 ${sel+1} 步，新步骤会插在它后面（再点一次序号取消）。`:'点某步左边的序号选中它：可看说明、移动、删除，新步骤会插在它后面。A/B 碗用来腌制、调碗汁，C 盘用来暂放或装盘。'}
+$('steps').addEventListener('click',e=>{const li=e.target.closest('.st');if(!li)return;const i=+li.dataset.i;
+  const op=e.target.closest('[data-op]');const seg=e.target.closest('.seg button');const pk=e.target.closest('[data-pick]');
+  if(seg){push();st.steps[i].f=+seg.dataset.v;full();return}
+  if(pk){openPick(i);return}
+  if(!op)return;const o=op.dataset.op;
+  if(o==='sel'){sel=sel===i?-1:i;renderSteps();paintTimes();return}
+  push();const S=st.steps;
+  if(o==='del'){S.splice(i,1);if(sel>=S.length)sel=S.length-1}
+  if(o==='dup')S.splice(i+1,0,JSON.parse(JSON.stringify(S[i])));
+  if(o==='up'&&i>0)[S[i-1],S[i]]=[S[i],S[i-1]];
+  if(o==='dn'&&i<S.length-1)[S[i+1],S[i]]=[S[i],S[i+1]];
+  full()});
+$('steps').addEventListener('focusin',e=>{if(e.target.matches('input,select'))pendingPush=true});
+let pendingPush=false;
+const onEdit=(e,final)=>{const el=e.target;if(!el.dataset.k)return;const li=el.closest('.st');const s=st.steps[+li.dataset.i];
+  if(pendingPush){push();pendingPush=false}
+  const k=el.dataset.k;let v=el.type==='checkbox'?(el.checked?1:0):el.value;
+  if(['g','s','keep'].includes(k))v=Math.max(0,+v||0);
+  if(k==='prep'&&!v)delete s.prep;else s[k]=v;
+  if(final&&(el.tagName==='SELECT'||el.type==='checkbox'))full();else{schedule();if(k==='s'){const u=el.nextElementSibling;if(u)u.textContent='秒 · '+fmtT(v)}}};
+$('steps').addEventListener('input',e=>onEdit(e,false));
+$('steps').addEventListener('change',e=>{onEdit(e,true);pendingPush=true});
+
+function newStep(t){let s;
+  if(t==='heat')s={t,f:2,s:60};else if(t==='rest')s={t,s:300};else if(t==='pour')s={t,from:'A',to:'pot',what:'all'};else if(t==='drain')s={t,c:'pot',kind:'oil',keep:30};
+  if(t==='add'){openPick(-1);return}
+  push();insert(s);full()}
+function insert(s){if(sel>=0){st.steps.splice(sel+1,0,s);sel++}else st.steps.push(s)}
+document.querySelector('.bar').addEventListener('click',e=>{const b=e.target.closest('[data-new]');if(b)newStep(b.dataset.new)});
+$('undo').onclick=()=>{if(!undo.length)return;st=JSON.parse(undo.pop());full();$('undo').disabled=!undo.length};
+$('reset').onclick=()=>{const d=DISHES.find(x=>x.id===st.dish)||DISHES[0];push();loadDish(d.id,1)};
+$('clear').onclick=()=>{push();st.steps=[];st.fin='pot';st.eat='all';sel=-1;full()};
+$('fin').onchange=e=>{push();st.fin=e.target.value;compute()};$('eat').onchange=e=>{push();st.eat=e.target.value;compute()};
+
+// 选料弹窗
+let pickFor=-1,pcat='全部';
+const PC=['全部','常用'].concat(FCATS.map(c=>'食材·'+c),CATS);
+const COMMON=['cy','salt','ls','lc','bt','xc','lj','cong','jiang','suan','gla','hj','db','dian','qs','hy','xyou'];
+function openPick(i){pickFor=i;$('mask').classList.add('on');$('q').value='';pcat=i>=0&&FD[st.steps[i].id]?'食材·'+FD[st.steps[i].id].cat:'常用';renderPick();setTimeout(()=>$('q').focus(),30)}
+function renderPick(){$('mcats').innerHTML=PC.map(c=>`<button data-c="${c}" aria-pressed="${c===pcat}">${c.replace('·','：')}</button>`).join('');
+  const q=$('q').value.trim();let L=[...Object.values(FD),...Object.values(IT)];
+  if(q)L=L.filter(d=>d.name.includes(q)||(d.note||'').includes(q));else if(pcat==='常用')L=COMMON.map(i=>IT[i]);else if(pcat.startsWith('食材·'))L=Object.values(FD).filter(d=>d.cat===pcat.slice(3));else if(pcat!=='全部')L=Object.values(IT).filter(d=>d.cat===pcat);
+  $('mpick').innerHTML=L.map(d=>`<button data-id="${d.id}"><b>${esc(d.name)}</b><span>${esc(d.kind==='f'?('食材 · '+d.cat+' · 默认切'+d.cut):(d.note||d.cat))}</span></button>`).join('')||'<p class="note">没有找到</p>'}
+$('mcats').onclick=e=>{const b=e.target.closest('button');if(b){pcat=b.dataset.c;$('q').value='';renderPick()}};
+$('q').oninput=renderPick;
+const closePick=()=>$('mask').classList.remove('on');
+$('mclose').onclick=closePick;$('mask').onclick=e=>{if(e.target.id==='mask')closePick()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePick()});
+$('mpick').onclick=e=>{const b=e.target.closest('button[data-id]');if(!b)return;const id=b.dataset.id;push();
+  if(pickFor>=0){const s=st.steps[pickFor];s.id=id;if(FD[id]){s.cut=FD[id].cut;if(!s.g||s.g<50)s.g=300}else{delete s.cut;delete s.prep;s.g=IT[id].def}}
+  else{const s={t:'add',c:'pot',id,g:FD[id]?300:IT[id].def};if(FD[id])s.cut=FD[id].cut;insert(s)}
+  closePick();full()};
+
+// 计算与绘制
+let timer=0;function schedule(){clearTimeout(timer);timer=setTimeout(compute,120)}
+function full(){renderDishes();renderSteps();const d=DISHES.find(x=>x.id===st.dish);
+  $('dname').textContent=(st.custom||(d?d.name:'自由调配'))+' · 步骤';$('ddesc').textContent=d?d.desc:'';
+  $('fin').value=st.fin;$('eat').value=st.eat;$('undo').disabled=!undo.length;compute()}
+function paintTimes(){if(!last)return;const {sim}=last;document.querySelectorAll('#steps .st').forEach((li,i)=>{const m=sim.marks[i];const p=sim.potLog[Math.max(0,m.t-1)];li.querySelector('.tm').textContent=clock(m.t)+(m.t>0&&p?` ${Math.round(p.T)}°`:'')})}
+function level(k,v){if(k==='salt')return v<1?'无':v<2.5?'淡':v<4?'偏淡':v<6.6?'适中':v<8?'偏咸':'齁咸';
+  if(NEG.some(n=>n[0]===k))return v<1?'无':v<2?'轻微':v<3.5?'可察觉':v<5?'明显':'严重';
+  return v<.6?'无':v<2?'微':v<4?'轻':v<6?'中':v<8?'重':'极重'}
+
+function compute(){
+  let sim,ev;try{sim=simulate(st.steps);ev=evaluate(sim,st.fin,st.eat)}catch(err){console.error(err);return}
+  const T=target();const W=warnings(sim,ev);const types=flavorTypes(ev.D,ev.flags);const meth=detectMethods(sim);
+  last={sim,ev,T};
+  const cmp=T?compare(ev.D,T.D):null;
+  $('score').innerHTML=cmp?`${cmp.score}<small> 分 相似度</small>`:'—<small> 自由调配</small>';
+  $('lgT').style.display=T?'':'none';
+  $('types').innerHTML=types.map((t,i)=>`<span class="tag${i?'':' main'}" title="${esc(t[1])}">${esc(t[0])}</span>`).join('');
+  $('method').textContent=meth.length?'工艺：'+meth.map(m=>m.l).join(' → '):'工艺：未加热（凉拌/生腌）';
+  const minutes=sim.t/60;
+  $('facts').innerHTML=[
+   ['成菜色泽',`<span class="sw" style="background:${ev.color.hex}"></span>${ev.color.name}`],
+   ['汤汁状态',ev.sauce],['总用时',fmtT(sim.t)],
+   ['锅里最高温',Math.round(sim.cs.pot.maxT)+'°C'],['剩余水分 / 油',`${Math.round(ev.water)} g / ${Math.round(ev.oil)} g`],
+   ['平均入味',Math.round(ev.absAvg*100)+'%']].map(f=>`<div><b>${f[0]}</b>${f[1]}</div>`).join('');
+  let hints=[];if(cmp){for(const [k,d] of cmp.diffs){const f=FIX[k];hints.push(`<li><b>${DN[k]}${d>0?'偏重':'不足'} ${d>0?'+':''}${d.toFixed(1)}</b>：${d>0?(f?'减少'+f[1]:'减少相关调料'):(f&&f[0]?'加'+f[0]:'检查做法')}</li>`)}
+    const tt=T.tex;for(const t of ev.tex){const o=tt.find(x=>x.id===t.id);if(o&&o.lab!==t.lab)hints.push(`<li><b>${esc(t.name)}</b>：标准是“${o.lab}”，你的是“${t.lab}”</li>`)}
+    if(!hints.length)hints.push('<li>和标准做法几乎一致。试着改一个变量看看会发生什么。</li>')}
+  $('hints').innerHTML=hints.slice(0,6).join('');
+  drawRadar(ev.D,T&&T.D);drawTemp(sim);
+  // 口感
+  $('tex').innerHTML=ev.tex.length?`<thead><tr><th>食材</th><th>口感</th><th>表面</th><th class="n">熟度</th><th class="n">入味</th><th class="n">腥膻残留</th></tr></thead><tbody>`+ev.tex.map(t=>`<tr><td>${esc(t.name)}<span class="note"> ${t.cut}${t.coated?' · 上浆':''}</span></td><td><b>${t.lab}</b></td><td>${t.surf||'—'}</td><td class="n">${Math.round(Math.min(1,t.done)*100)}%</td><td class="n">${Math.round(t.abs*100)}%</td><td class="n">${Math.round(t.off*100)}%</td></tr>`).join('')+'</tbody>':'<tr><td class="note">成品里还没有食材。</td></tr>';
+  // 拆解
+  $('dims').innerHTML=DIMS.concat(NEG).map(([k,n])=>{const v=ev.D[k],t=T?T.D[k]:null;const neg=NEG.some(x=>x[0]===k);
+    return `<button class="row${neg?' neg':''}" data-k="${k}" aria-expanded="false"><span>${n}</span><span class="tr"><span class="fill" style="width:${v*10}%"></span>${t!=null?`<span class="tk" style="left:calc(${t*10}% - 1px)"></span>`:''}</span><span class="v">${v.toFixed(1)}</span><span class="d">${level(k,v)}</span></button><div class="srcs" hidden data-s="${k}"></div>`}).join('');
+  // 提醒
+  const good=[];if(!W.some(w=>w[0]>=1))good.push([-1,'火候和调味没有明显问题。']);
+  $('warns').innerHTML=W.concat(good).sort((a,b)=>b[0]-a[0]).map(w=>`<li class="${w[0]<0?'ok':'l'+w[0]}">${esc(w[1])}</li>`).join('');
+  aromaPanel($('raroma'),ev.c);
+  paintTimes();
+  try{localStorage.setItem('tw.last',JSON.stringify(st))}catch(e){}
+}
+$('dims').onclick=e=>{const b=e.target.closest('.row');if(!b||!last)return;const k=b.dataset.k;const box=b.nextElementSibling;const open=box.hidden;box.hidden=!open;b.setAttribute('aria-expanded',open);
+  if(open){const m={};for(const [n,v] of last.ev.src[k]){if(v>0)m[n]=(m[n]||0)+v}const L=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,5);const tot=L.reduce((s,x)=>s+x[1],0)||1;
+    box.textContent=L.length?'主要来自：'+L.map(([n,v])=>`${n} ${Math.round(v/tot*100)}%`).join('、'):'没有来源'}};
+
+// 雷达
+const rs=$('radar').querySelector('svg');let RD=null;
+function drawRadar(D,T){RD=[D,T];paintRadar()}
+function paintRadar(){if(RD)radarSVG(rs,DIMS,RD[0],RD[1])}
+const ro1=new ResizeObserver(paintRadar);ro1.observe(rs);
+
+// 锅温
+const ts=$('tchart').querySelector('svg');let TD=null;
+function drawTemp(sim){TD=sim;paintTemp()}
+function paintTemp(){if(!TD)return;const sim=TD;const W=ts.clientWidth,H=ts.clientHeight;if(!W)return;
+  const L=40,Rr=40,Tp=10,B=26,w=W-L-Rr,h=H-Tp-B;const tmax=Math.max(10,sim.t);const hist=sim.hist;const wmax=Math.max(50,...hist.map(p=>p.w));
+  const X=t=>L+t/tmax*w,Y=T=>Tp+h-(Math.min(260,T)/260)*h,YW=v=>Tp+h-v/wmax*h;
+  let g='';for(const T of[0,100,150,200,250]){g+=`<line x1="${L}" x2="${L+w}" y1="${Y(T)}" y2="${Y(T)}" stroke="var(--line)" ${T===100?'stroke-dasharray="4 3"':''}/><text x="${L-6}" y="${Y(T)+4}" text-anchor="end" font-size="12" fill="var(--mute)">${T}°</text>`}
+  g+=`<text x="${L+w+6}" y="${Tp+10}" font-size="12" fill="var(--mute)">${Math.round(wmax)}g</text>`;
+  const step=Math.max(1,Math.ceil(hist.length/600));const hs=hist.filter((p,i)=>i%step===0||i===hist.length-1);
+  g+=`<path d="M${X(0)},${YW(0)} ${hs.map(p=>`L${X(p.t).toFixed(1)},${YW(p.w).toFixed(1)}`).join(' ')} L${X(tmax)},${YW(0)}Z" fill="var(--soy)" fill-opacity=".22"/>`;
+  sim.marks.slice(0,-1).forEach((m,i)=>{if(W<520&&i%2)return;g+=`<line x1="${X(m.t)}" x2="${X(m.t)}" y1="${Tp}" y2="${Tp+h}" stroke="var(--mute)" stroke-opacity=".25"/>`});
+  const tickN=W<520?3:6;for(let k=0;k<=tickN;k++){const t=tmax*k/tickN;g+=`<text x="${X(t)}" y="${H-8}" text-anchor="middle" font-size="12" fill="var(--mute)">${clock(t)}</text>`}
+  g+=`<path d="${hs.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+','+Y(p.T).toFixed(1)).join(' ')}" fill="none" stroke="var(--red2)" stroke-width="2.2"/>`;
+  g+=`<rect x="${L}" y="${Tp}" width="${w}" height="${h}" fill="transparent" id="hit"/>`;ts.innerHTML=g;
+  const tip=$('tip');ts.querySelector('#hit').onpointermove=e=>{const r=ts.getBoundingClientRect();const t=(e.clientX-r.left-L)/w*tmax;let best=hist[0];for(const p of hist)if(Math.abs(p.t-t)<Math.abs(best.t-t))best=p;
+    let si=0;sim.marks.forEach((m,i)=>{if(m.t<=best.t)si=i});tip.style.display='block';tip.textContent=`${clock(best.t)} · 第${Math.min(si+1,st.steps.length)}步 · ${Math.round(best.T)}°C · 水 ${Math.round(best.w)}g · 油 ${Math.round(best.o)}g`;
+    tip.style.left=Math.min(W-200,Math.max(0,e.clientX-r.left-90))+'px';tip.style.top='0px'};
+  ts.querySelector('#hit').onpointerleave=()=>tip.style.display='none'}
+const ro2=new ResizeObserver(paintTemp);ro2.observe(ts);
+
+// 保存
+function mine(){try{return JSON.parse(localStorage.getItem('tw.mine')||'[]')}catch(e){return[]}}
+function renderMine(){const M=mine();$('mineList').innerHTML=M.map((m,i)=>`<button class="btn sm" data-m="${i}">${esc(m.name)}</button><button class="btn sm" data-x="${i}" aria-label="删除 ${esc(m.name)}">✕</button>`).join('')}
+$('save').onclick=()=>{const n=$('saveName').value.trim()||('我的'+(DISHES.find(d=>d.id===st.dish)||{name:'配方'}).name);const M=mine();M.push({name:n,st:JSON.parse(JSON.stringify(st))});try{localStorage.setItem('tw.mine',JSON.stringify(M));$('saveName').value='';renderMine()}catch(e){$('saveName').value='本机存储不可用'}};
+$('mineList').onclick=e=>{const b=e.target.closest('button');if(!b)return;const M=mine();if(b.dataset.m){push();st=JSON.parse(JSON.stringify(M[+b.dataset.m].st));st.custom=M[+b.dataset.m].name;sel=-1;full()}else if(b.dataset.x){M.splice(+b.dataset.x,1);try{localStorage.setItem('tw.mine',JSON.stringify(M))}catch(e){}renderMine()}};
+$('copyJ').onclick=async()=>{try{await navigator.clipboard.writeText(JSON.stringify(st));$('copyMsg').textContent='已复制'}catch(e){$('imp').value=JSON.stringify(st);$('copyMsg').textContent='复制被拦截，已放进下面的文本框'}};
+$('doImp').onclick=()=>{try{const o=JSON.parse($('imp').value);if(!Array.isArray(o.steps))throw 0;
+  const ok=o.steps.filter(s=>['add','heat','rest','pour','drain'].includes(s.t)&&(s.t!=='add'||IT[s.id]||FD[s.id]));push();st={dish:DISHES.some(d=>d.id===o.dish)?o.dish:'',steps:ok,fin:CN[o.fin]?o.fin:'pot',eat:o.eat==='drain'?'drain':'all',custom:'导入的配方'};sel=-1;full()}catch(e){$('copyMsg').textContent='无法识别这段配方'}};
+
+$('raroma').innerHTML=AROMA_HTML;
+// 供其他模式调用
+window.openInEditor=(o)=>{push();st=o;sel=-1;full()};
+window.remixRefresh=()=>{paintRadar();paintTemp();const b=$('raroma');if(b._draw)b._draw()};
+// 启动
+let init=null;try{init=JSON.parse(localStorage.getItem('tw.last')||'null')}catch(e){}
+if(init&&Array.isArray(init.steps)&&init.steps.every(s=>s.t!=='add'||IT[s.id]||FD[s.id])){st=init;full()}else loadDish(DISHES[0].id);
+renderMine();
+}
+
+// ===== 从零下厨：实时灶台 =====
+{
+const $=id=>document.getElementById(id);
+const CN={pot:'锅',A:'A 碗',B:'B 碗',C:'C 盘'};
+let L=liveNew(),fire=0,lid=0,mode='wok',run=false,speed=5,acc=0,to='pot',eat='all',log=[],cur=null,shelfCat='常用',dirty=true,lastEv=null,served=null;
+const COMMON=['cy','zy','salt','ls','lc','bt','xc','lj','cong','jiang','suan','gla','hj','db','dian','qs','hy','xyou'];
+
+// 货架
+const SC=['常用'].concat(FCATS.map(c=>'食材：'+c),CATS);
+function shelf(){const q=$('sq').value.trim();let Ls;
+  if(q)Ls=[...Object.values(FD),...Object.values(IT)].filter(d=>d.name.includes(q)||(d.note||'').includes(q));
+  else if(shelfCat==='常用')Ls=COMMON.map(i=>IT[i]);else if(shelfCat.startsWith('食材：'))Ls=Object.values(FD).filter(d=>d.cat===shelfCat.slice(3));else Ls=Object.values(IT).filter(d=>d.cat===shelfCat);
+  $('scats').innerHTML=SC.map(c=>`<button data-c="${c}" aria-pressed="${c===shelfCat&&!q}">${c}</button>`).join('');
+  $('sgrid').innerHTML=Ls.map(d=>`<button data-id="${d.id}" aria-pressed="${cur&&cur.id===d.id}">${esc(d.name)}</button>`).join('')||'<span class="note">没有找到</span>'}
+$('scats').onclick=e=>{const b=e.target.closest('button');if(!b)return;shelfCat=b.dataset.c;$('sq').value='';shelf()};
+$('sq').oninput=shelf;
+$('sgrid').onclick=e=>{const b=e.target.closest('button[data-id]');if(!b)return;const id=b.dataset.id;const d=FD[id]||IT[id];
+  cur={id,g:FD[id]?300:d.def,cut:FD[id]?d.cut:null,prep:''};shelf();pickPanel()};
+function pickPanel(){const p=$('spick');if(!cur){p.innerHTML='<p class="note">从上面选一样东西。</p>';return}
+  const d=FD[cur.id]||IT[cur.id];const chips=(FD[cur.id]?[100,200,300,500]:d.oil?[10,20,40,80]:d.water?[50,100,300,800]:[.5,1,2,5,10,20]);
+  p.innerHTML=`<div class="fl"><b style="font-size:18px">${esc(d.name)}</b><input type="number" id="pg" min="0" step="${cur.g<5?.5:5}" value="${cur.g}" aria-label="克数"><span class="unit">g</span>${chips.map(c=>`<button class="btn sm" data-g="${c}">${c}g</button>`).join('')}</div>
+  ${FD[cur.id]?`<div class="fl" style="margin-top:6px"><select id="pcut">${Object.keys(CUTS).map(c=>`<option${c===cur.cut?' selected':''}>${c}</option>`).join('')}</select><select id="pprep"><option value="">直接用</option><option value="blanch">先焯水</option><option value="preboil">先煮熟</option></select></div>`:''}
+  <p class="note" style="margin:6px 0">${esc(FD[cur.id]?'食材 · '+d.cat:(d.note||d.cat))}</p>
+  <button class="btn pri" id="pgo" style="width:100%">放进${CN[to]}</button>`;
+  $('pg').oninput=e=>cur.g=Math.max(0,+e.target.value||0);
+  p.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{cur.g=+b.dataset.g;$('pg').value=cur.g});
+  if($('pcut'))$('pcut').onchange=e=>cur.cut=e.target.value;if($('pprep'))$('pprep').onchange=e=>cur.prep=e.target.value;
+  $('pgo').onclick=()=>{if(!(cur.g>0))return;const s={t:'add',c:to,id:cur.id,g:cur.g};if(cur.cut)s.cut=cur.cut;if(cur.prep)s.prep=cur.prep;act(s,`${CN[to]}里放 ${nameOf(cur.id)} ${cur.g}g`)}}
+const nameOf=id=>(IT[id]||FD[id]||{name:'?'}).name;
+$('sto').onclick=e=>{const b=e.target.closest('button');if(!b)return;to=b.dataset.v;$('sto').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));pickPanel()};
+
+function act(s,text){liveApply(L,s,true);note(text);served=null;dirty=true;paint()}
+function note(t){log.unshift([L.t,t,Math.round(L.cs.pot.T)]);log=log.slice(0,40)}
+
+// 控制
+$('sfire').onclick=e=>{const b=e.target.closest('button');if(!b)return;fire=+b.dataset.v;$('sfire').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));note(fire?['','开小火','开中火','开大火'][fire]:'关火');if(fire&&!run)setRun(true);paint()};
+$('slid').onclick=()=>{lid=lid?0:1;$('slid').setAttribute('aria-pressed',!!lid);$('slid').textContent=lid?'盖着盖':'没盖盖';note(lid?'盖上锅盖':'揭开锅盖');paint()};
+$('smode').onchange=e=>{mode=e.target.value;note(mode==='steam'?'改为隔水蒸':'改为锅中加热')};
+function setRun(v){run=v;$('splay').textContent=run?'❚❚ 暂停':'▶ 开始计时';$('splay').setAttribute('aria-pressed',run)}
+$('splay').onclick=()=>setRun(!run);
+$('sspeed').onclick=e=>{const b=e.target.closest('button');if(!b)return;speed=+b.dataset.v;$('sspeed').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b))};
+$('sskip').onclick=e=>{const b=e.target.closest('button');if(!b)return;liveRun(L,+b.dataset.s,fire,mode,lid,true);served=null;dirty=true;paint()};
+$('smove').onclick=e=>{const b=e.target.closest('button');if(!b)return;const o=b.dataset;
+  if(o.from)act({t:'pour',from:o.from,to:o.to,what:o.what||'all'},b.textContent);
+  else if(o.drain){const keep=+$('skeep').value||0;act({t:'drain',c:'pot',kind:o.drain,keep},o.drain==='oil'?`沥油，留 ${keep}g`:`倒掉汤汁，留 ${keep}g`)}};
+$('seat').onchange=e=>{eat=e.target.value;dirty=true;paint()};
+$('sreset').onclick=()=>{L=liveNew();fire=0;lid=0;setRun(false);log=[];served=null;$('sfire').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.v==='0'));$('slid').setAttribute('aria-pressed',false);$('slid').textContent='没盖盖';$('sreport').hidden=true;dirty=true;paint()};
+
+// 循环
+setInterval(()=>{if(!run||document.body.dataset.mode!=='stove')return;acc+=.1*speed;const n=Math.floor(acc);if(n>0){acc-=n;liveRun(L,n,fire,mode,lid,true);dirty=true}},100);
+setInterval(()=>{if(dirty&&document.body.dataset.mode==='stove'){dirty=false;paint()}},250);
+
+function finalC(){const c=L.cs;if(c.pot.foods.length||c.pot.items.length)return'pot';for(const k of['C','A','B'])if(c[k].foods.length)return k;return'pot'}
+function paint(){
+  const fin=finalC();const ev=evaluate(L,fin,eat);lastEv=ev;const p=L.cs.pot;const T=p.T;
+  $('sclock').textContent=clock(L.t);$('stemp').textContent=Math.round(T)+'°C';$('swat').textContent=Math.round(p.water)+' g';$('soil').textContent=Math.round(p.oil)+' g';
+  const z=T<95?'温':T<101&&p.water>3?'沸腾':T<110?'微热':T<160?'爆香区':T<190?'易糊区':'冒烟';$('szone').textContent=z;
+  $('smark').style.bottom=Math.min(100,T/260*100)+'%';
+  drawWok(p,T,ev);contents();
+  $('slog').innerHTML=log.slice(0,8).map(l=>`<li><b>${clock(l[0])}</b> ${esc(l[1])} <span class="note">${l[2]}°</span></li>`).join('')||'<li class="note">空锅。先选油，放进锅，再开火。</li>';
+  radarSVG($('sradar').querySelector('svg'),DIMS,ev.D,null);
+  const types=flavorTypes(ev.D,ev.flags);$('stypes').innerHTML=types.map((t,i)=>`<span class="tag${i?'':' main'}">${esc(t[0])}</span>`).join('');
+  const W=warnings(L,ev).filter(w=>w[0]>=1).slice(0,4);
+  const live=[];for(const e of p.items){const d=IT[e.id];if(e.burn>.05&&T>d.burnT)live.push([2,`${d.name}正在焦糊！`]);else if(d.burnT<900&&T>d.burnT-10&&e.burn<.05)live.push([1,`锅温 ${Math.round(T)}°C 接近${d.name}的焦化点`])}
+  aromaPanel($('saroma'),L.cs[fin]);
+  $('swarn').innerHTML=live.concat(W).slice(0,5).map(w=>`<li class="l${w[0]}">${esc(w[1])}</li>`).join('')||'<li class="ok">暂时一切正常。</li>';
+}
+function contents(){const out=[];
+  for(const k of['pot','A','B','C']){const c=L.cs[k];if(!c.foods.length&&!c.items.length&&c.water<1)continue;
+    const rows=[];for(const f of c.foods){const t=texture(f,FD[f.id]);rows.push(`<li><b>${esc(t.name)}</b> ${Math.round(f.g)}g ${t.cut}<span class="note"> · ${t.lab}${t.surf?' · '+t.surf:''} · 熟 ${Math.round(Math.min(1,f.done)*100)}% · 入味 ${Math.round(f.abs*100)}%</span></li>`)}
+    for(const e of c.items){const d=IT[e.id];if(d.water&&!d.tas.umami&&!d.sugar)continue;const bits=[];
+      if(d.oil){if(Object.keys(d.raw).length)bits.push(`生油味剩 ${Math.round(e.rawLeft*100)}%`)}else if(d.rOil||d.rWater)bits.push(`出香 ${Math.round((e.ro+e.rw)*100)}%`);if(Object.keys(d.raw).length&&!d.oil)bits.push(`生味剩 ${Math.round(e.rawLeft*100)}%`);
+      if(d.sugar)bits.push(`焦化 ${Math.round(Math.min(1.7,e.car)/1*100)}%`);if(d.alc)bits.push(`酒精剩 ${Math.round(e.alc/(e.g*d.alc+1e-9)*100)}%`);if(d.tv)bits.push(`酸味剩 ${Math.round((1-e.tl)*100)}%`);
+      if(e.burn>.02)bits.push(`<span style="color:var(--bad)">焦 ${Math.round(e.burn*100)}%</span>`);
+      rows.push(`<li>${esc(d.name)} ${+e.g.toFixed(1)}g${bits.length?`<span class="note"> · ${bits.join(' · ')}</span>`:''}</li>`)}
+    out.push(`<div><h3>${CN[k]} <span class="note">${Math.round(c.T)}°C · 水 ${Math.round(c.water)}g · 油 ${Math.round(c.oil)}g</span></h3><ul class="clist">${rows.join('')}</ul></div>`)}
+  $('scont').innerHTML=out.join('')||'<p class="note">锅碗都是空的。</p>'}
+
+// 锅的样子
+const FCOL={'肉':'#d98b84','禽':'#e8c3a6','水产':'#efe7dc','蛋':'#f2cf4a','豆制品':'#f4efe2','蔬菜':'#5d9c4a','菌菇':'#8a6a4f','其他':'#d8d0c0'};
+const SCOL={gla:'#b3241a',xmj:'#d22',pj:'#d44',dj:'#c33',ljm:'#a32',cong:'#4c9a3c',sm:'#4c9a3c',xcai:'#3f8f3a',suan:'#f1e6c8',jiang:'#e3c27a',hj:'#7b2f1f',qhj:'#4a6b2a',db:'#9b2b17',ds:'#2b1d17',bj:'#6b3a1e',gp:'#7a4a2a',xy:'#5a6b3a',cg:'#5a3a2a',zr:'#8a6a3a',hs:'#c68a4a',zm:'#efe3c6'};
+function mix(a,b,t){const p=x=>[1,3,5].map(i=>parseInt(x.slice(i,i+2),16));const A=p(a),B=p(b);return'#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join('')}
+function rnd(i){const x=Math.sin(i*99.13+7.7)*43758.5;return x-Math.floor(x)}
+function drawWok(p,T,ev){const s=$('wok');const W=s.clientWidth||400;const H=s.clientHeight||300;
+  const cx=200,cy=150;let g=`<defs><radialGradient id="iron" cx=".5" cy=".3" r=".8"><stop offset="0" stop-color="#5a504b"/><stop offset="1" stop-color="#1c1816"/></radialGradient><linearGradient id="fl" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#2d6bd8"/><stop offset=".45" stop-color="#f2a33a"/><stop offset="1" stop-color="#e8452c" stop-opacity="0"/></linearGradient></defs>`;
+  // 火
+  if(fire){for(let i=0;i<5+fire*3;i++){const x=150+i*(100/(4+fire*3));const h=18+fire*14+rnd(i+L.t%7)*10;g+=`<path class="flame" d="M${x-7},262 Q${x},${262-h*1.3} ${x+7},262Z" fill="url(#fl)" opacity=".9"/>`}}
+  g+=`<rect x="110" y="262" width="180" height="10" rx="4" fill="#3a3330"/>`;
+  // 锅
+  g+=`<path d="M60,120 Q200,300 340,120Z" fill="url(#iron)"/><ellipse cx="200" cy="120" rx="140" ry="26" fill="#2a2421"/><ellipse cx="200" cy="120" rx="132" ry="22" fill="#3b3330"/>`;
+  g+=`<rect x="330" y="112" width="62" height="12" rx="6" fill="#4a3b2f"/>`;
+  // 液体与油
+  const lvl=Math.min(1,(p.water+p.oil*.6)/700);if(p.water>2||p.oil>2){const ry=6+lvl*12,rx=60+lvl*66,yy=176-lvl*50;
+    const base=p.water>2?mix('#c9b48a',ev.color.hex,.6):'#d9a531';g+=`<ellipse cx="${cx}" cy="${yy}" rx="${rx}" ry="${ry}" fill="${base}" opacity="${p.water>2?.85:.55}"/>`;
+    if(p.oil>2)g+=`<ellipse cx="${cx-rx*.25}" cy="${yy-ry*.3}" rx="${rx*.4}" ry="${ry*.35}" fill="#ffe08a" opacity="${Math.min(.6,p.oil/120)}"/>`}
+  // 食材块
+  let k=0;p.foods.forEach((f,fi)=>{const d=FD[f.id];let col=FCOL[d.cat]||'#ccc';if(d.cat==='肉'||d.cat==='禽')col=mix(col,'#c9a78c',Math.min(1,f.done));col=mix(col,'#8a4a1c',Math.min(1,f.brown*.6));if(f.burnt>.2)col=mix(col,'#1a1410',Math.min(1,f.burnt));
+    const n=Math.min(22,4+Math.round(f.g/30));const sz=6+f.sf*5;for(let i=0;i<n;i++,k++){const a=rnd(k)*Math.PI*2,r=rnd(k+50)*95;const x=cx+Math.cos(a)*r,y=150+Math.sin(a)*r*.32;g+=`<rect x="${x-sz/2}" y="${y-sz/3}" width="${sz}" height="${sz*.66}" rx="${sz*.25}" fill="${col}" stroke="rgba(0,0,0,.25)" stroke-width=".6" transform="rotate(${rnd(k+9)*90} ${x} ${y})"/>`}});
+  p.items.forEach((e,ei)=>{const c0=SCOL[e.id];if(!c0||e.g<.5)return;const col=e.burn>.2?mix(c0,'#120d0a',Math.min(1,e.burn*1.3)):c0;const n=Math.min(16,2+Math.round(e.g/2));for(let i=0;i<n;i++,k++){const a=rnd(k)*Math.PI*2,r=rnd(k+31)*100;g+=`<circle cx="${cx+Math.cos(a)*r}" cy="${148+Math.sin(a)*r*.3}" r="${2+rnd(k+3)*2}" fill="${col}"/>`}});
+  // 蒸汽、油烟
+  const burning=p.items.some(e=>e.burn>.1&&T>IT[e.id].burnT)||p.foods.some(f=>f.burnt>.2);
+  if(T>=95&&p.water>3&&!lid)for(let i=0;i<4;i++){const x=140+i*40;g+=`<path class="steam" d="M${x},100 q-12,-20 0,-40 q12,-20 0,-40" stroke="#bbb" stroke-width="5" fill="none" stroke-linecap="round" opacity=".55"/>`}
+  if(T>195||burning)for(let i=0;i<3;i++){const x=160+i*40;g+=`<path class="steam" d="M${x},96 q-16,-22 4,-44 q18,-22 -4,-44" stroke="${burning?'#444':'#999'}" stroke-width="9" fill="none" stroke-linecap="round" opacity=".45"/>`}
+  if(!p.water&&p.oil>3&&T>130&&(p.foods.length||p.items.length>1))g+=`<text x="290" y="88" font-size="18" fill="var(--red2)" font-weight="700">滋啦</text>`;
+  if(lid)g+=`<path d="M70,118 Q200,10 330,118Z" fill="#9aa3a8" opacity=".9"/><rect x="188" y="52" width="24" height="12" rx="5" fill="#333"/>`;
+  s.innerHTML=g}
+$('saroma').innerHTML=AROMA_HTML+`<h3>存为香料包</h3><div class="fl"><input id="smixn" placeholder="给锅里这包料起个名" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn" id="smix">加入调料架</button></div><p class="note" id="smixmsg"></p>`;
+$('smix').onclick=()=>{const r=potToBlend(L.cs[finalC()]);if(!r){$('smixmsg').textContent='锅里没有可识别的香料。';return}const nm=($('smixn').value.trim()||'锅里这包料').slice(0,16);const spec=blendToSeasoning(nm,r.items,r.m,blendInfo(r.items,r.m));const id='mx'+Date.now().toString(36);registerMix(id,spec);MIXES.push({id,spec});saveMixes();$('smixn').value='';$('smixmsg').textContent=`已加入调料架：“自配·${nm}”（按${METHODS[r.m.method]}计）。`;shelf()};
+const roW=new ResizeObserver(()=>{dirty=true});roW.observe($('wok'));
+
+// 出锅
+$('sserve').onclick=()=>{setRun(false);const fin=finalC();const ev=evaluate(L,fin,eat);
+  if(foodMass(L.cs[fin])<=50){const pa=potAroma(L.cs[fin]);$('sreport').hidden=false;
+    $('srep').innerHTML=pa?`<p>锅里没有食材，只有香料（${pa.used.map(u=>esc(u[0])+' '+(+u[1].toFixed(1))+'g').join('、')}）。这是一锅<b>${esc(pa.near[0].b.name)}</b>风格的料：${esc(describe(pa.info))}</p><p class="note">适配的菜、香型匹配和用量见上方“香料复合香味”。想看它下菜的效果，可以继续往锅里加食材再出锅；或者存为香料包，在其他菜里用。</p>`:'<p>锅里没有食材，也没有香料，还没什么可评的。</p>';
+    $('sreport').scrollIntoView({behavior:'smooth',block:'start'});return}const near=nearestDishes(ev.D,L.steps).slice(0,3);served={fin,ev,near};
+  const tex=ev.tex.map(t=>`${t.name}：${t.lab}${t.surf?'（'+t.surf+'）':''}`).join('；')||'没有食材';
+  $('srep').innerHTML=`<p>${esc(describeDish(ev))}</p><p class="note">口感：${esc(tex)}</p>
+   <h3>最像哪道经典菜</h3><div class="near">${near.map((n,i)=>`<div class="ncard${i?'':' first'}"><b>${n.d.name}</b><span class="big2">${n.score}</span><span class="note">味道 ${n.flavor} · 用料 ${n.ing}</span>
+    <span class="note">${n.diffs.slice(0,2).map(([k,d])=>`${DN[k]}${d>0?'多':'少'} ${Math.abs(d).toFixed(1)}`).join('，')||'味道很接近'}</span></div>`).join('')}</div>
+   <div class="fl" style="margin-top:10px"><button class="btn pri" id="sopen">在编辑器里打开这份记录</button><span class="note">会以“${near[0].d.name}”作对照，可逐步修改。</span></div>`;
+  $('sreport').hidden=false;$('sreport').scrollIntoView({behavior:'smooth',block:'start'});
+  $('sopen').onclick=()=>{window.openInEditor({dish:near[0].d.id,steps:JSON.parse(JSON.stringify(L.steps)),fin,eat,custom:'我的灶台记录'});location.hash='remix'}};
+function describeDish(ev){const t=flavorTypes(ev.D,ev.flags)[0][0];const top=DIMS.map(([k,n])=>[n,ev.D[k]]).filter(x=>x[1]>=3).sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>x[0]);
+  const salt=ev.D.salt<2.5?'偏淡':ev.D.salt>6.8?'偏咸':'咸淡合适';return `成菜判定为${t}，${salt}，色泽${ev.color.name}，${ev.sauce}${top.length?'，突出'+top.join('、'):''}。`+(ev.D.burnt>2?' 有糊味。':'')+(ev.D.off>2.5?' 腥膻没压住。':'')}
+
+function potToBlend(c){const acc={};let ro=0,rw=0,ws=0,n=0;
+  for(const e of c.items){const parts=spxOf(e.id);if(!parts)continue;for(const [sid,f] of parts)acc[sid]=(acc[sid]||0)+e.g*f;ro+=e.ro;rw+=e.rw;ws+=e.wetSec;n++}
+  if(!n)return null;const items=Object.entries(acc).map(([id,g])=>({id,g:+g.toFixed(2)}));
+  const m=rw>ro&&rw>.1?{method:'water',kg:1,min:Math.round(ws/n/60),lid:1,form:'whole'}:ro>.1?{method:'oil',kg:1,oilT:140,sec:60,form:'whole'}:{method:'powder',kg:1};
+  return{items,m}}
+window.stoveShow=()=>{shelf();pickPanel();dirty=true;paint()};
+}
+
+// ===== 调香料 =====
+{
+const $=id=>document.getElementById(id);
+let B={items:[],m:{method:'water',kg:1,min:60,lid:1,oilT:130,sec:60,form:'whole'},name:''};let pc='主香';
+try{const s=JSON.parse(localStorage.getItem('tw.blend')||'null');if(s&&Array.isArray(s.items))B=s}catch(e){}
+if(!B.items.length)loadBlend('hs');
+function loadBlend(id){const b=BLENDS.find(x=>x.id===id);B={items:Object.entries(b.it).map(([id,g])=>({id,g})),m:Object.assign({kg:1,min:60,lid:1,oilT:130,sec:60,form:'whole'},b.m),name:b.name,from:id}}
+$('xpre').innerHTML=BLENDS.map(b=>`<button data-b="${b.id}">${b.name}</button>`).join('');
+$('xpre').onclick=e=>{const b=e.target.closest('button');if(!b)return;loadBlend(b.dataset.b);render()};
+$('xclear').onclick=()=>{B.items=[];B.name='';B.from=null;render()};
+function params(){const m=B.m;let h=`<label>方法 <select data-m="method">${Object.entries(METHODS).map(([k,v])=>`<option value="${k}"${m.method===k?' selected':''}>${v}</option>`).join('')}</select></label>
+  <label>用于主料 <input type="number" min="0.1" step="0.5" value="${m.kg}" data-m="kg"> kg</label>`;
+  if(m.method==='oil')h+=`<label>油温 <input type="number" min="80" max="260" step="5" value="${m.oilT}" data-m="oilT"> °C</label><label>炸 <input type="number" min="0" step="10" value="${m.sec}" data-m="sec"> 秒</label>`;
+  if(m.method==='water')h+=`<label>煮 <input type="number" min="0" step="5" value="${m.min}" data-m="min"> 分钟</label><label><input type="checkbox" data-m="lid"${m.lid?' checked':''}> 加盖</label>`;
+  if(m.method==='oil'||m.method==='water')h+=`<label>形态 <select data-m="form"><option value="whole"${m.form!=='powder'?' selected':''}>整粒</option><option value="powder"${m.form==='powder'?' selected':''}>粉末</option></select></label>`;
+  $('xparams').innerHTML=h}
+$('xparams').addEventListener('change',e=>{const k=e.target.dataset.m;if(!k)return;B.m[k]=e.target.type==='checkbox'?(e.target.checked?1:0):(e.target.tagName==='SELECT'?e.target.value:+e.target.value);if(k==='method'||k==='form')render();else calc()});
+$('xparams').addEventListener('input',e=>{const k=e.target.dataset.m;if(!k||e.target.tagName==='SELECT'||e.target.type==='checkbox')return;B.m[k]=+e.target.value;calc()});
+function list(){$('xlist').innerHTML=B.items.length?B.items.map((it,i)=>{const d=SPX[it.id];const mx=Math.max(d.max*2,it.g/Math.max(.1,B.m.kg)*1.2)*Math.max(.1,B.m.kg);
+  return `<li data-i="${i}"><span class="xn"><b>${d.name}</b><span class="role">${d.role}</span></span><input type="range" min="0" max="${+mx.toFixed(1)}" step="${d.max<2?.1:.5}" value="${it.g}" data-k="r" aria-label="${d.name}用量"><input type="number" min="0" step="${d.max<2?.1:.5}" value="${it.g}" data-k="n" aria-label="${d.name}克数"><span class="unit">g</span><button class="x" data-k="del" aria-label="移除${d.name}">✕</button><span class="note xt">${d.tip}</span></li>`}).join(''):'<li class="note">还没有香料。从下面挑。</li>'}
+$('xlist').addEventListener('input',e=>{const li=e.target.closest('li[data-i]');if(!li)return;const i=+li.dataset.i;const v=Math.max(0,+e.target.value||0);B.items[i].g=v;
+  li.querySelector(e.target.dataset.k==='r'?'[data-k=n]':'[data-k=r]').value=v;B.from=null;calc()});
+$('xlist').addEventListener('click',e=>{const b=e.target.closest('[data-k=del]');if(!b)return;B.items.splice(+b.closest('li').dataset.i,1);B.from=null;render()});
+function shelf(){$('xcats').innerHTML=Object.keys(SCATS).map(c=>`<button data-c="${c}" aria-pressed="${c===pc}">${c}</button>`).join('');
+  const have=new Set(B.items.map(i=>i.id));$('xshelf').innerHTML=SCATS[pc].map(id=>{const d=SPX[id];return `<button data-id="${id}"${have.has(id)?' aria-pressed="true"':''}><b>${d.name}</b><span>${esc(d.tip)}</span></button>`}).join('')}
+$('xcats').onclick=e=>{const b=e.target.closest('button');if(b){pc=b.dataset.c;shelf()}};
+$('xshelf').onclick=e=>{const b=e.target.closest('button[data-id]');if(!b)return;const id=b.dataset.id;const ex=B.items.find(i=>i.id===id);
+  if(ex)ex.g=+(ex.g+SPX[id].max*.3*B.m.kg).toFixed(1);else B.items.push({id,g:+(SPX[id].max*.5*Math.max(.1,B.m.kg)).toFixed(1)});B.from=null;render()};
+function render(){params();list();shelf();calc()}
+
+let curve=null,info=null;
+function calc(){info=blendInfo(B.items,B.m);
+  radarSVG($('xradar').querySelector('svg'),NOTES,info.D,B.from?blendProfile(BLENDS.find(b=>b.id===B.from)).D:null,{color:'var(--soy)'});
+  $('xdesc').textContent=describe(info);
+  $('xlayers').innerHTML=Object.entries(info.layers).map(([k,v])=>`<div><b>${k}</b>${v.length?v.map(x=>`${x[0]} <span class="note">${x[1].toFixed(1)}</span>`).join('<br>'):'<span class="note">—</span>'}</div>`).join('');
+  const cols=['#9b4a1c','#c8321e','#d9a321','#4c7a3c','#6a4a8a','#2f6f8a','#8a6a3a','#b86a8a'];
+  $('xshare').innerHTML=info.share.filter(s=>s[1]>.005).map(([id,v],i)=>`<div class="srow"><span>${SPX[id].name}</span><span class="tr"><span class="fill" style="width:${v*100}%;background:${cols[i%cols.length]}"></span></span><span class="v">${Math.round(v*100)}%</span></div>`).join('')||'<p class="note">—</p>';
+  curve=blendCurve(B.items,B.m);$('xcurvebox').hidden=!curve;if(curve)paintCurve();
+  const near=matchBlends(info).slice(0,3);
+  $('xmatch').innerHTML=near.map((n,i)=>`<div class="ncard${i?'':' first'}"><b>${n.b.name}</b><span class="big2">${n.score}</span><span class="note">${n.b.use}</span></div>`).join('');
+  const kgTot=B.items.reduce((a,i)=>a+i.g,0)/Math.max(.1,B.m.kg);
+  const dishes=[];const seen=new Set();for(const n of near)if(n.score>=60)for(const d of n.b.dishes)if(!seen.has(d)){seen.add(d);dishes.push([d,n.b.name])}
+  $('xdish').innerHTML=(dishes.slice(0,8).map(([d,b])=>`<span class="tag" title="来自 ${esc(b)} 风格">${esc(d)}</span>`).join('')||'<span class="note">和经典香型差别较大，参考下面的方向。</span>');
+  $('xrules').innerHTML=dishRules(info).map(r=>`<li><b>${r[0]}</b>：${r[1]}</li>`).join('')+`<li><b>用量</b>：按当前比例，每 1kg 主料约用 ${kgTot.toFixed(1)}g 这包料${B.m.method==='water'?'（配 2–3L 水）':''}。</li>`;
+  const W=blendWarnings(B.items,B.m,info);
+  if(info.col.red>2)W.push([-1,'带红色素（辣椒/紫草），成菜偏红亮。']);if(info.col.yellow>2)W.push([-1,'带黄色素（姜黄/栀子），成菜偏黄。']);
+  $('xwarn').innerHTML=W.sort((a,b)=>b[0]-a[0]).map(w=>`<li class="${w[0]<0?'ok':'l'+w[0]}">${esc(w[1])}</li>`).join('')||'<li class="ok">配比合理，没有明显问题。</li>';
+  $('xname').placeholder=B.name?B.name+'（我的版本）':'给这包料起个名';
+  try{localStorage.setItem('tw.blend',JSON.stringify(B))}catch(e){}}
+function paintCurve(){const s=$('xcurve').querySelector('svg');const W=s.clientWidth,H=s.clientHeight;if(!W||!curve)return;
+  const P=curve.pts;const L=36,R=12,T=10,Bm=24,w=W-L-R,h=H-T-Bm;const tmax=P[P.length-1][0]||1;const amax=Math.max(10,...P.map(p=>p[1]));
+  const X=t=>L+t/tmax*w,Ya=v=>T+h-v/amax*h,Yb=v=>T+h-v/10*h;const best=bestTime(curve);const now=B.m.method==='water'?(+B.m.min||0):(+B.m.sec||0);
+  let g='';for(const v of[0,.5,1])g+=`<line x1="${L}" x2="${L+w}" y1="${T+h*(1-v)}" y2="${T+h*(1-v)}" stroke="var(--line)"/>`;
+  g+=`<path d="${P.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+','+Ya(p[1]).toFixed(1)).join(' ')}" fill="none" stroke="var(--soy)" stroke-width="2.5"/>`;
+  g+=`<path d="${P.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+','+Yb(p[2]).toFixed(1)).join(' ')}" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 3"/>`;
+  g+=`<line x1="${X(best)}" x2="${X(best)}" y1="${T}" y2="${T+h}" stroke="var(--ok)" stroke-width="2"/><text x="${Math.min(X(best)+4,W-90)}" y="${T+14}" font-size="12" fill="var(--ok)">建议 ${best}${curve.unit}</text>`;
+  if(now<=tmax)g+=`<circle cx="${X(now)}" cy="${Ya(P.reduce((a,p)=>Math.abs(p[0]-now)<Math.abs(a[0]-now)?p:a)[1])}" r="5" fill="var(--red2)"/>`;
+  for(let k=0;k<4;k++){const t=tmax*k/4;g+=`<text x="${X(t)}" y="${H-6}" text-anchor="middle" font-size="12" fill="var(--mute)">${Math.round(t)}</text>`}
+  g+=`<text x="${L+w}" y="${H-6}" text-anchor="end" font-size="12" fill="var(--mute)">${curve.unit}</text>`;s.innerHTML=g;
+  $('xbest').textContent=`香气（实线）在约 ${best}${curve.unit}时最平衡，之后苦涩（虚线）上升快于香气。红点是你当前设定。`}
+const ro=new ResizeObserver(()=>{if(info){radarSVG($('xradar').querySelector('svg'),NOTES,info.D,B.from?blendProfile(BLENDS.find(b=>b.id===B.from)).D:null,{color:'var(--soy)'});paintCurve()}});ro.observe($('xradar'));ro.observe($('xcurve'));
+$('xsend').onclick=()=>{if(!B.items.length)return;const nm=($('xname').value.trim()||(B.name?B.name+'(自配)':'自配香料')).slice(0,16);
+  const spec=blendToSeasoning(nm,B.items,B.m,info);if(!spec)return;const id='mx'+Date.now().toString(36);registerMix(id,spec);MIXES.push({id,spec});saveMixes();
+  $('xsent').textContent=`已加入调料架：“自配·${nm}”，在另两个模式的“香料”分类里可以找到，建议每 500g 主料约 ${spec.def}g。`;$('xname').value=''};
+window.spiceShow=render;
+}
+
+
+{const subs={remix:'选一道经典菜作底，改调料的种类、用量、下锅顺序和火候，看锅温、出水、焦化怎样一步步改变最终味道。',stove:'从空锅开始：倒油、开火、下料，时间实时流动。看着锅温和每样东西的出香、焦化、熟度，出锅时评菜并找出最像的经典菜。',spice:'自己配香料：选方法和时长，模拟复合香气的前中后调、提取曲线和苦涩，匹配经典香型，告诉你适合做什么菜。'};
+function route(){let m=(location.hash||'#remix').slice(1);if(!subs[m])m='remix';document.body.dataset.mode=m;
+  for(const k in subs){document.getElementById('v-'+k).hidden=k!==m}
+  document.querySelectorAll('.modes a').forEach(a=>a.setAttribute('aria-current',a.getAttribute('href')==='#'+m?'page':'false'));
+  document.getElementById('sub').textContent=subs[m];
+  if(m==='stove')window.stoveShow();else if(m==='spice')window.spiceShow();else window.remixRefresh()}
+window.addEventListener('hashchange',route);route();}
+
+</script>
+</body></html>
