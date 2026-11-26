@@ -2,7 +2,7 @@
 
 从零拆解烹饪：按秒模拟锅温、水分、油量，以及每种调料的出香、挥发、焦糊和食材的熟度、口感，再按自己的口味自动改良，生成自己的菜谱。
 
-在线使用：开启 GitHub Pages 后访问 `https://mingxintan-coder.github.io/cook/`。菜谱库数据在 `recipes.json`，需要通过网址打开（直接双击本地文件时读不到菜谱库，其余功能可用）。
+在线使用：开启 GitHub Pages 后访问 `https://mingxintan-coder.github.io/Cook/（注意 C 大写）`。菜谱库数据在 `recipes.json`，需要通过网址打开（直接双击本地文件时读不到菜谱库，其余功能可用）。
 
 ## 模块
 
