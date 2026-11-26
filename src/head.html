@@ -225,6 +225,10 @@ body:not(.showxd) .prow.xd{display:none}
 .ing .it{display:inline-block;white-space:nowrap;margin-right:12px}
 #fnum button[aria-pressed=true]{background:var(--red2);color:#fff}
 .mhead{background:var(--bg);border-radius:12px;padding:12px;margin:10px 0;border:1.5px solid var(--soy)}.mhead b{font-size:18px}
+.stars{display:inline-flex;gap:2px}.stars button{border:0;background:none;font-size:26px;line-height:1;padding:4px 2px;min-height:40px;min-width:34px;color:var(--line);cursor:pointer}.stars button.on{color:#e0a100}
+.fbk{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}.fbk button{font-size:14px;padding:6px 10px;min-height:36px;border-radius:18px;border:1px solid var(--line);background:var(--card);color:var(--ink)}.fbk button[aria-pressed=true]{background:var(--soy);color:#fff;border-color:var(--soy)}
+.prof{background:var(--bg);border:1.5px solid var(--soy);border-radius:12px;padding:12px;margin:0 0 12px}.prof .tg{display:inline-block;padding:3px 10px;border-radius:12px;background:var(--card);border:1px solid var(--line);margin:2px 4px 2px 0;font-size:14px}.prof .tg.s{border-color:var(--red2);color:var(--red2)}
+.lrn{display:flex;margin-top:8px;font-size:15px}.lrn input:disabled+span{color:var(--mute)}
 </style></head><body>
 <header class="top">
  <h1>锅气 · 中餐调味模拟器</h1>
@@ -347,7 +351,7 @@ body:not(.showxd) .prow.xd{display:none}
    <h2>家里有什么</h2><p class="note" style="margin:0 0 6px">输入或点选现有食材，程序会把能搭的组合、各种味型和做法都试一遍，按你的口味挑出最好吃的几道。</p>
    <div class="fl"><input id="ftext" placeholder="例如：茼蒿 牛肋条 鸡蛋 番茄（空格或逗号隔开）" style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn" id="fparse">识别</button></div>
    <div id="funk"></div><div class="chips" id="ffcats" style="margin-top:8px"></div><div class="sgrid" id="ffgrid"></div><div id="ffsel"></div>
-   <h3>口味</h3><div id="fpref"></div>
+   <h3>口味</h3><div id="fpref"></div><label class="unit lrn"><input type="checkbox" id="flearn"> <span id="flearnt">按我的打分调口味</span></label>
    <h3>做几道菜</h3><div class="fl"><span class="seg" id="fnum"></span><label class="unit"><input type="checkbox" id="fsoup"> 带一个汤</label></div>
    <p class="note" style="margin:4px 0 0">选 1 道：给出几种不同做法任你挑；选 2–5 道：把食材分到各道菜里，配成一桌，口味做法不重样。</p>
    <h3>时间</h3><span class="seg" id="ftime"></span>
@@ -361,7 +365,7 @@ body:not(.showxd) .prow.xd{display:none}
    <h3>味型</h3><div class="chips2" id="astyle"></div>
    <h3>做法</h3><span class="seg" id="amethod"></span>
    <h3>口感</h3><div class="fl" id="atex"></div>
-   <h3>限制</h3><div class="chips2" id="acons"></div>
+   <h3>限制</h3><div class="chips2" id="acons"></div><label class="unit lrn"><input type="checkbox" id="alearn"> <span id="alearnt">按我的打分调口味</span></label>
    <div class="fl" style="margin-top:14px"><button class="btn pri" id="ago">设计这道菜</button><button class="btn" id="achef" hidden>请 Claude 主厨设计</button><button class="btn sm" id="astop" hidden>停止</button></div>
    <p class="note" id="achefnote" hidden style="margin:6px 0 0">“设计这道菜”在本机几秒算完；Claude 主厨会自己构思，在模拟器里试做几次再改，约需 1 分钟。</p>
    <p class="note" id="astat"></p>
@@ -377,7 +381,7 @@ body:not(.showxd) .prow.xd{display:none}
  </div>
 </main>
 <main class="wrap view" id="v-book" hidden>
- <section class="card"><h2>我的菜谱</h2><div class="bgrid" id="blist"></div>
+ <section class="card"><h2>我的菜谱</h2><p class="note" style="margin:0 0 8px">做完一道菜就回来打个分、点一下哪里不对。打分越多，程序越懂你的口味，设计新菜时会自动照着调。</p><div id="bprof"></div><div class="bgrid" id="blist"></div>
   <details><summary>导出 / 导入</summary><div class="fl"><button class="btn sm" id="bcopy">复制全部菜谱</button><span class="note" id="bmsg"></span></div><textarea id="bimp" placeholder="把复制的菜谱粘贴到这里"></textarea><button class="btn sm" id="bdoimp">导入</button></details></section>
 </main>
 <div class="mask" id="lib"><div class="modal" role="dialog" aria-label="菜谱库"><div class="mh"><input id="lq" placeholder="搜菜名或食材：锅包肉、茄子、羊肉…"><button class="btn" id="lclose">关闭</button></div><div class="cats" id="lchefs"></div><p class="note" id="lstat" style="margin:0 16px"></p><p class="note" id="lcount" style="margin:0 16px 6px"></p><div class="pick lpick" id="llist"></div></div></div>

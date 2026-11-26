@@ -225,6 +225,10 @@ body:not(.showxd) .prow.xd{display:none}
 .ing .it{display:inline-block;white-space:nowrap;margin-right:12px}
 #fnum button[aria-pressed=true]{background:var(--red2);color:#fff}
 .mhead{background:var(--bg);border-radius:12px;padding:12px;margin:10px 0;border:1.5px solid var(--soy)}.mhead b{font-size:18px}
+.stars{display:inline-flex;gap:2px}.stars button{border:0;background:none;font-size:26px;line-height:1;padding:4px 2px;min-height:40px;min-width:34px;color:var(--line);cursor:pointer}.stars button.on{color:#e0a100}
+.fbk{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}.fbk button{font-size:14px;padding:6px 10px;min-height:36px;border-radius:18px;border:1px solid var(--line);background:var(--card);color:var(--ink)}.fbk button[aria-pressed=true]{background:var(--soy);color:#fff;border-color:var(--soy)}
+.prof{background:var(--bg);border:1.5px solid var(--soy);border-radius:12px;padding:12px;margin:0 0 12px}.prof .tg{display:inline-block;padding:3px 10px;border-radius:12px;background:var(--card);border:1px solid var(--line);margin:2px 4px 2px 0;font-size:14px}.prof .tg.s{border-color:var(--red2);color:var(--red2)}
+.lrn{display:flex;margin-top:8px;font-size:15px}.lrn input:disabled+span{color:var(--mute)}
 </style></head><body>
 <header class="top">
  <h1>锅气 · 中餐调味模拟器</h1>
@@ -347,7 +351,7 @@ body:not(.showxd) .prow.xd{display:none}
    <h2>家里有什么</h2><p class="note" style="margin:0 0 6px">输入或点选现有食材，程序会把能搭的组合、各种味型和做法都试一遍，按你的口味挑出最好吃的几道。</p>
    <div class="fl"><input id="ftext" placeholder="例如：茼蒿 牛肋条 鸡蛋 番茄（空格或逗号隔开）" style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn" id="fparse">识别</button></div>
    <div id="funk"></div><div class="chips" id="ffcats" style="margin-top:8px"></div><div class="sgrid" id="ffgrid"></div><div id="ffsel"></div>
-   <h3>口味</h3><div id="fpref"></div>
+   <h3>口味</h3><div id="fpref"></div><label class="unit lrn"><input type="checkbox" id="flearn"> <span id="flearnt">按我的打分调口味</span></label>
    <h3>做几道菜</h3><div class="fl"><span class="seg" id="fnum"></span><label class="unit"><input type="checkbox" id="fsoup"> 带一个汤</label></div>
    <p class="note" style="margin:4px 0 0">选 1 道：给出几种不同做法任你挑；选 2–5 道：把食材分到各道菜里，配成一桌，口味做法不重样。</p>
    <h3>时间</h3><span class="seg" id="ftime"></span>
@@ -361,7 +365,7 @@ body:not(.showxd) .prow.xd{display:none}
    <h3>味型</h3><div class="chips2" id="astyle"></div>
    <h3>做法</h3><span class="seg" id="amethod"></span>
    <h3>口感</h3><div class="fl" id="atex"></div>
-   <h3>限制</h3><div class="chips2" id="acons"></div>
+   <h3>限制</h3><div class="chips2" id="acons"></div><label class="unit lrn"><input type="checkbox" id="alearn"> <span id="alearnt">按我的打分调口味</span></label>
    <div class="fl" style="margin-top:14px"><button class="btn pri" id="ago">设计这道菜</button><button class="btn" id="achef" hidden>请 Claude 主厨设计</button><button class="btn sm" id="astop" hidden>停止</button></div>
    <p class="note" id="achefnote" hidden style="margin:6px 0 0">“设计这道菜”在本机几秒算完；Claude 主厨会自己构思，在模拟器里试做几次再改，约需 1 分钟。</p>
    <p class="note" id="astat"></p>
@@ -377,7 +381,7 @@ body:not(.showxd) .prow.xd{display:none}
  </div>
 </main>
 <main class="wrap view" id="v-book" hidden>
- <section class="card"><h2>我的菜谱</h2><div class="bgrid" id="blist"></div>
+ <section class="card"><h2>我的菜谱</h2><p class="note" style="margin:0 0 8px">做完一道菜就回来打个分、点一下哪里不对。打分越多，程序越懂你的口味，设计新菜时会自动照着调。</p><div id="bprof"></div><div class="bgrid" id="blist"></div>
   <details><summary>导出 / 导入</summary><div class="fl"><button class="btn sm" id="bcopy">复制全部菜谱</button><span class="note" id="bmsg"></span></div><textarea id="bimp" placeholder="把复制的菜谱粘贴到这里"></textarea><button class="btn sm" id="bdoimp">导入</button></details></section>
 </main>
 <div class="mask" id="lib"><div class="modal" role="dialog" aria-label="菜谱库"><div class="mh"><input id="lq" placeholder="搜菜名或食材：锅包肉、茄子、羊肉…"><button class="btn" id="lclose">关闭</button></div><div class="cats" id="lchefs"></div><p class="note" id="lstat" style="margin:0 16px"></p><p class="note" id="lcount" style="margin:0 16px 6px"></p><div class="pick lpick" id="llist"></div></div></div>
@@ -1536,7 +1540,7 @@ function design(spec,budgetMs){const t0=Date.now();budgetMs=budgetMs||3500;spec=
   const fin=spec.method==='蒸'?'C':spec.method==='凉拌'?'B':'pot';const eat=spec.style==='五香卤'?'drain':'all';
   let amt={};const ev=a=>{let S=buildSteps(spec,a);const r=runEval(S,fin,eat);return{S,r,L:designScore(r,T,spec)}};
   return designSearch(spec,T,fin,eat,amt,ev,t0,budgetMs)}
-function designTarget(spec){const T=styleTarget(spec.style);if(spec.method==='凉拌'){if(spec.style==='蒜香'){T.pungent=5;T.wok=0;T.roast=1.5}T.wok=Math.min(T.wok,1);T.roast=Math.min(T.roast,2)}if(spec.method==='蒸')T.wok=Math.min(T.wok,1.5);if(spec.cons&&spec.cons.lowSalt)T.salt=Math.max(3.8,T.salt-1.2);if(spec.cons&&spec.cons.lowSugar)T.sweet=Math.max(0,T.sweet-2);if(spec.cons&&spec.cons.noSpicy){T.spicy=0}if(spec.pref&&typeof prefTarget==='function')prefTarget(T,spec.pref);return T}
+function designTarget(spec){const T=styleTarget(spec.style);if(spec.method==='凉拌'){if(spec.style==='蒜香'){T.pungent=5;T.wok=0;T.roast=1.5}T.wok=Math.min(T.wok,1);T.roast=Math.min(T.roast,2)}if(spec.method==='蒸')T.wok=Math.min(T.wok,1.5);if(spec.cons&&spec.cons.lowSalt)T.salt=Math.max(3.8,T.salt-1.2);if(spec.cons&&spec.cons.lowSugar)T.sweet=Math.max(0,T.sweet-2);if(spec.cons&&spec.cons.noSpicy){T.spicy=0}if(spec.pref&&typeof prefTarget==='function')prefTarget(T,spec.pref,spec.style);return T}
 function designSearch(spec,T,fin,eat,amt,ev,t0,budgetMs){
   let best=ev(amt);let iter=0;const ids=[...new Set(STYLES[spec.style].kit.map(x=>x[0]).concat(['zyc']))];
   const knobs=['_t','_v','_oil','_T','_p','_w'];
@@ -1567,6 +1571,54 @@ function designNotes(spec,steps,r){const N=[];const has=id=>steps.some(s=>s.t===
   if(spec.method==='蒸')N.push('蒸好倒掉腥味重的蒸汁，再淋豉油、泼热油激出葱香。');
   const t=r.ev.tex.map(x=>x.name+x.lab).join('、');if(t)N.push(`成品口感：${t}。`);
   return N}
+
+// 口味学习：给做过的菜打分 + 反馈 → 学出“我的口味画像” → 用来设计新菜
+const FB=[['太咸','salt',-1],['太淡','salt',1],['太甜','sweet',-1],['不够甜','sweet',1],['太酸','sour',-1],['不够酸','sour',1],
+ ['太辣','spicy',-1],['不够辣','spicy',1],['太麻','numb',-1],['不够麻','numb',1],['不够鲜','umami',1],['锅气不够','wok',1],
+ ['酱味太重','ferment',-1],['香料味太冲','spice',-1],['太油腻','rich',-1],['不够浓郁','rich',1],
+ ['肉太老','tex','meat:嫩'],['肉不够烂','tex','meat:烂'],['菜太软','tex','veg:脆'],['菜太生','tex','veg:软']];
+const FBMAP=Object.fromEntries(FB.map(x=>[x[0],x]));
+const STEP={salt:.7,sweet:1,sour:1,spicy:1.3,numb:1.2,umami:1,wok:1,ferment:1,spice:1,rich:1};
+const LDIMS=['salt','sweet','sour','spicy','numb','umami','wok','ferment','spice','rich'];
+const DIMN=Object.fromEntries(DIMS);
+// 打分时给菜拍个“快照”：模拟出的味道 + 味型/做法/主料
+function snapOf(b){const ev=evaluate(simulate(b.steps),b.fin,b.eat);const D={};for(const k of LDIMS)D[k]=+(ev.D[k]||0).toFixed(2);
+  let style=b.style||'';if(!style){const m=/(?:AI 设计|冰箱推荐) · ([^ ·]+)/.exec(b.note||'');if(m&&STYLES[m[1]])style=m[1]}
+  if(!style){const ft=flavorTypes(ev.D,ev.flags).map(x=>x[0]);style=ft.find(n=>STYLES[n])||''}
+  let method=b.method||'';if(!method){const m=/ · [^ ·]+ · ([^ ·]+)/.exec(b.note||'');if(m)method=m[1]}
+  const foods=[...new Set(b.steps.filter(s=>s.t==='add'&&FD[s.id]).map(s=>FD[s.id].base||s.id))];return{D,style,method,foods}}
+function rateOf(b){return b.rates&&b.rates.length?b.rates[b.rates.length-1]:null}
+// 学习：每道菜按最近一次打分；反馈给方向，高分且没反馈的菜说明“这个味道正合适”
+function learnProfile(B){const R=B.filter(b=>rateOf(b)&&b.snap);const P={n:R.length,delta:{},style:{},food:{},method:{},meat:'',veg:'',ev:{}};if(!R.length)return P;
+  const acc={};for(const k of LDIMS)acc[k]=[0,0];const sty={},fd={},me={};const tex={};const sd={};
+  R.forEach((b,idx)=>{const r=rateOf(b),sn=b.snap,s=r.s;const rec=.6+.4*(idx<8?1:.5);// 最近的菜权重大一点（book 最新在前）
+    const T=sn.style&&STYLES[sn.style]?styleTarget(sn.style):null;const tagDims=new Set();
+    for(const t of r.tags||[]){const f=FBMAP[t];if(!f)continue;if(f[1]==='tex'){const [k,v]=f[2].split(':');tex[k]=tex[k]||{};tex[k][v]=(tex[k][v]||0)+rec;continue}
+      const d=f[1];tagDims.add(d);const ideal=sn.D[d]+f[2]*STEP[d]*(s<=2?1.4:1);const ref=T?T[d]:sn.D[d];const x=T?ideal-ref:f[2]*STEP[d];acc[d][0]+=1.5*rec*x;acc[d][1]+=1.5*rec}
+    if(s>=4&&T)for(const d of ['salt','sweet','sour','spicy','numb']){if(tagDims.has(d))continue;if((d==='spicy'||d==='numb')&&T[d]<.8&&sn.D[d]<.8)continue;const w=(s-3)*.3*rec;acc[d][0]+=w*(sn.D[d]-T[d]);acc[d][1]+=w}
+    if(sn.style)for(const t of r.tags||[]){const f=FBMAP[t];if(!f||f[1]==='tex')continue;const d=f[1];sd[sn.style]=sd[sn.style]||{};const o=sd[sn.style][d]=sd[sn.style][d]||[0,0];o[0]+=f[2]*STEP[d]*(s<=2?1.4:1)*rec;o[1]+=rec}
+    const v=(s-3)*rec;const add=(o,k)=>{if(!k)return;o[k]=o[k]||[0,0];o[k][0]+=v;o[k][1]+=1};add(sty,sn.style);add(me,sn.method);for(const f of sn.foods)add(fd,f)});
+  for(const k of LDIMS){const [a,w]=acc[k];if(w>0){P.delta[k]=+Math.max(-2.5,Math.min(2.5,a/(w+1.2))).toFixed(2);P.ev[k]=+w.toFixed(1)}}
+  P.sdelta={};for(const st in sd){P.sdelta[st]={};for(const d in sd[st]){const [a,w]=sd[st][d];P.sdelta[st][d]=+Math.max(-2,Math.min(2,a/(w+.6)-(P.delta[d]||0)*.5)).toFixed(2)}}
+  const sh=(o,c,m)=>{const out={};for(const k in o){const [a,n]=o[k];out[k]=+Math.max(-m,Math.min(m,a/(n+c)*m/2)).toFixed(1)}return out};
+  P.style=sh(sty,.6,8);P.method=sh(me,1.5,3);P.food=sh(fd,2,3);
+  for(const k of ['meat','veg'])if(tex[k]){const best=Object.entries(tex[k]).sort((a,b)=>b[1]-a[1])[0];if(best[1]>=.9)P[k]=best[0]}return P}
+// 应用：调目标味道
+function learnTarget(T,L,style){if(!L||!L.n)return T;const D=Object.assign({},L.delta);const S=style&&L.sdelta&&L.sdelta[style];if(S)for(const k in S)D[k]=(D[k]||0)+S[k];for(const k in D){if((k==='spicy'||k==='numb')&&(T[k]||0)<.6)continue;T[k]=Math.max(0,Math.min(9.5,(T[k]||0)+D[k]))}return T}
+// 应用：给味型 / 主料 / 做法加减分
+function learnBonus(L,style,foods,method){if(!L||!L.n)return 0;let s=(L.style[style]||0);if(method)s+=L.method[method]||0;let f=0;for(const id of foods)f+=L.food[FD[id]&&FD[id].base||id]||0;s+=Math.max(-4,Math.min(4,f));
+  for(const k of ['spicy','sweet','sour','numb']){const d=L.delta[k]||0;if(Math.abs(d)<.5)continue;const tg=STYLE_TASTE[style]||{};if(tg[k])s+=Math.sign(d)*Math.min(3,Math.abs(d)*1.5)*tg[k]}return Math.max(-10,Math.min(10,s))}
+const STYLE_TASTE={'麻辣':{spicy:1,numb:1},'宫保':{spicy:.6,sweet:.5,numb:.4},'鱼香':{sweet:.6,sour:.6,spicy:.4},'酸辣':{sour:1,spicy:.8},'家常':{spicy:.7},'糖醋':{sweet:1,sour:1},'红烧':{sweet:.5},'茄汁':{sweet:.6,sour:.6},'孜然':{spicy:.5}};
+// 把画像翻译成人话
+function profileText(L){if(!L||!L.n)return{lines:[],likes:[],dislikes:[]};const lines=[];
+  const word={salt:['偏淡','偏咸'],sweet:['少甜','偏甜'],sour:['少酸','偏酸'],spicy:['少辣','更辣'],numb:['少麻','更麻'],umami:['','更鲜'],wok:['','锅气更足'],ferment:['酱味轻些','酱香更浓'],spice:['香料轻些','香料更足'],rich:['清爽些','更浓郁']};
+  for(const k of LDIMS){const d=L.delta[k]||0;if(Math.abs(d)<.3)continue;const w=word[k][d>0?1:0];if(!w)continue;lines.push({k,w,d,strong:Math.abs(d)>=1})}
+  const st=Object.entries(L.style).filter(x=>x[1]!==0).sort((a,b)=>b[1]-a[1]);const likes=st.filter(x=>x[1]>=1).slice(0,4).map(x=>x[0]);const dislikes=st.filter(x=>x[1]<=-1).slice(-3).map(x=>x[0]);
+  const fl=Object.entries(L.food).filter(x=>x[1]>=1).sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>FD[x[0]]?FD[x[0]].name.split('/')[0]:x[0]);
+  return{lines,likes,dislikes,foods:fl,meat:L.meat,veg:L.veg}}
+// 按一次打分改良这道菜：反馈 → improve() 的口味方向
+function rateToPrefs(r){const P={delta:{},meat:'',veg:'',cons:{},missing:[]};const k=r.s<=2?2:1;
+  for(const t of r.tags||[]){const f=FBMAP[t];if(!f)continue;if(f[1]==='tex'){const [a,v]=f[2].split(':');P[a]=v}else P.delta[f[1]]=f[2]*k}return P}
 
 // ===== 冰箱模式：现有食材 + 口味 → 最好吃的几道菜 =====
 const FOOD_WORDS=[['五花','wh'],['里脊','lji'],['通脊','lji'],['猪肉片','lji'],['肉丝','lji'],['瘦肉','lji'],['排骨','pg'],['肉末','rm'],['肉馅','rm'],['绞肉','rm'],['猪蹄','zt'],['猪肝','zg'],['肥肠','fc'],['牛腩','nn'],['牛腱','nn'],['牛肉','nr'],['肥牛','nr'],['羊肉','yr'],['羊排','yr'],['鸡腿','jt'],['鸡块','jt'],['鸡肉','jt'],['鸡胸','jx'],['鸡翅','jc'],['鸡爪','jz'],['鸭','ya'],['鱼','yu'],['虾','xia'],['鱿鱼','yy'],['鸡蛋','jd'],['蛋','jd'],['豆腐皮','gdf'],['干豆腐','gdf'],['豆腐','dfu'],['茄子','qz'],['土豆','td'],['马铃薯','td'],['青菜','qcai'],['小白菜','qcai'],['油菜','bcai'],['菠菜','bcai'],['生菜','bcai'],['白菜','baic'],['包菜','baic'],['圆白菜','baic'],['卷心菜','baic'],['青椒','qjz'],['尖椒','qjz'],['彩椒','qjz'],['辣椒','qjz'],['西红柿','fq'],['番茄','fq'],['香菇','xg'],['蘑菇','xg'],['平菇','xg'],['杏鲍菇','xg'],['金针菇','jzg'],['木耳','mr'],['胡萝卜','hlb'],['萝卜','lb'],['黄瓜','hg'],['西葫芦','hg'],['粉丝','ms'],['粉条','ms'],['豆角','dou'],['四季豆','dou'],['豆芽','dy'],['芹菜','qc'],['蒜苔','qc'],['韭菜','jc2'],['西兰花','xlh'],['菜花','xlh'],['冬瓜','dg'],['南瓜','dg'],['莲藕','ou'],['藕','ou'],['面条','mt'],['年糕','mt'],['米饭','mfan'],['火腿','huot'],['腊肉','huot'],['香肠','huot']];
@@ -1628,10 +1680,10 @@ function combos(foods){const ids=foods.map(f=>f.id);const M=ids.filter(isMeatId)
   for(const m of M)for(let a=0;a<V.length;a++)for(let b=a+1;b<V.length;b++)C.push([m,V[a],V[b]]);
   if(M.includes('jd'))for(const v of V)C.push(['jd',v]);
   const seen=new Set();return C.filter(c=>{const k=c.slice().sort().join('+');if(seen.has(k))return false;seen.add(k);return true})}
-function prefTarget(T,pref){const P=pref||{};const sp={'不辣':-9,'微辣':-1,'中辣':0,'重辣':1.5}[P.spicy||'中辣']||0;if(sp<-5)T.spicy=0;else T.spicy=Math.max(0,Math.min(9,T.spicy+sp*1.2));
+function prefTarget(T,pref,style){const P=pref||{};const sp={'不辣':-9,'微辣':-1,'中辣':0,'重辣':1.5}[P.spicy||'中辣']||0;if(sp<-5)T.spicy=0;else T.spicy=Math.max(0,Math.min(9,T.spicy+sp*1.2));
   if(P.sweet==='爱甜')T.sweet=Math.min(9,T.sweet+1.2);if(P.sweet==='不爱甜')T.sweet=Math.max(0,T.sweet-1.5);
   if(P.sour==='爱酸')T.sour=Math.min(9,T.sour+1.2);if(P.numb==='怕麻')T.numb=Math.min(T.numb,1);if(P.numb==='爱麻')T.numb=Math.min(9,T.numb+1.5);
-  if(P.heavy==='清淡'){T.salt=Math.max(3.8,T.salt-1);T.rich=Math.max(0,(T.rich||0)-1)}if(P.heavy==='重口')T.salt=Math.min(6.6,T.salt+.4);return T}
+  if(P.heavy==='清淡'){T.salt=Math.max(3.8,T.salt-1);T.rich=Math.max(0,(T.rich||0)-1)}if(P.heavy==='重口')T.salt=Math.min(6.6,T.salt+.4);if(P.learn&&typeof learnTarget==='function')learnTarget(T,P.learn,style);return T}
 function prefScore(style,pref,D){const P=pref||{};let s=5;const spicy=SPICY_STYLES.includes(style);
   if(P.spicy==='不辣')s+=spicy?-10:3;if(P.spicy==='重辣')s+=spicy?4:-3;
   if(P.sweet==='爱甜'&&['糖醋','红烧','鱼香'].includes(style))s+=3;if(P.sweet==='不爱甜'&&['糖醋','红烧'].includes(style))s-=4;
@@ -1645,13 +1697,17 @@ function fridgePlan(input){const foods=input.foods.filter(f=>FD[f.id]);if(!foods
   for(const c of combos(foods))for(const style of Object.keys(STYLES)){
     if(input.pref&&input.pref.spicy==='不辣'&&['麻辣','宫保','酸辣','家常'].includes(style))continue;
     if(style==='汤'&&c.some(id=>rootOf(id)==='jd')&&c.some(id=>isMeatId(id)&&FD[id].coll>=30))continue;
+    if(style==='汤'&&c.some(id=>fitScore('汤',[id])<.6))continue;
     if(!canStyle(style,pantry))continue;if(style==='茄汁'&&(!c.includes('fq')||c.length<2))continue;const fit=fitScore(style,c);if(fit<.55)continue;
-    const spec={foods:c.map(id=>({id,g:gOf[id]||defaultG(id,c)})),style,method:'自动',meat:'',veg:'',cons:Object.assign({},input.cons||{},input.pref&&input.pref.spicy==='不辣'?{noSpicy:true}:{}),missing,pref:input.pref};
-    jobs.push({spec,fit,pair:pairScore(c),ps:prefScore(style,input.pref)})}
+    const L=input.pref&&input.pref.learn;const spec={foods:c.map(id=>({id,g:gOf[id]||defaultG(id,c)})),style,method:'自动',meat:L&&L.meat||'',veg:L&&L.veg||'',cons:Object.assign({},input.cons||{},input.pref&&input.pref.spicy==='不辣'?{noSpicy:true}:{}),missing,pref:input.pref};
+    jobs.push({spec,fit,pair:pairScore(c),ps:prefScore(style,input.pref)+(L&&typeof learnBonus==='function'?learnBonus(L,style,c,''):0)})}
   return{jobs,missing}}
-function quickEval(job){const spec=Object.assign({},job.spec);spec.method=autoMethod(spec.foods,spec.style);const T=prefTarget(designTarget(spec),spec.pref);
+function quickEval(job){const spec=Object.assign({},job.spec);spec.method=autoMethod(spec.foods,spec.style);const T=designTarget(spec);if(spec.pref&&spec.pref.learn&&!job._lm){job._lm=1;job.ps+=spec.pref.learn.method[spec.method]||0}
   const fin=spec.method==='蒸'?'C':spec.method==='凉拌'?'B':'pot';const eat=spec.style==='五香卤'?'drain':'all';
   const S=buildSteps(spec,{});const r=runEval(S,fin,eat);const L=designScore(r,T,spec);job.q=Math.max(0,100-L*3);job.t=r.sim.t;job.total=tasty(job,job.q);return job}
+// 第二轮：快速筛完后挑最有希望的几十个，用短搜索把用量调准再排名（默认用量常常差很多）
+function refineList(jobs,k){return jobs.filter(j=>j.total>=0).map(j=>[j,j.fit*28+j.pair+j.ps+.55*Math.max(j.q||0,78)]).sort((a,b)=>b[1]-a[1]).slice(0,k||36).map(x=>x[0])}
+function refineJob(j,ms){const r=design(j.spec,ms||35);j.q=Math.max(j.q||0,r.score);j.t=r.r.sim.t;j.total=tasty(j,j.q);return j}
 function tasty(job,perfect){return Math.round(Math.max(0,Math.min(100,perfect*.55+job.fit*28+job.pair+job.ps+2)))}
 function pickTop(jobs,n){const L=jobs.filter(j=>j.total>=55).sort((a,b)=>b.total-a.total);const out=[];const perCombo={},perFood={},perStyle={};
   for(const j of L){const ids=j.spec.foods.map(f=>f.id);const ck=ids.slice().sort().join('+');const st=j.spec.style;
@@ -1663,7 +1719,7 @@ function pickTop(jobs,n){const L=jobs.filter(j=>j.total>=55).sort((a,b)=>b.total
 function menuPlan(jobs,n,opt){opt=opt||{};const C=jobs.filter(j=>j.total>=30).sort((a,b)=>b.total-a.total).slice(0,90);const allFoods=new Set(jobs.flatMap(j=>j.spec.foods.map(f=>f.id)));
   const ids=j=>j.spec.foods.map(f=>f.id);const isSoup=j=>j.spec.style==='汤';const meatDish=j=>ids(j).some(isMeatId);
   const ok=(set,j)=>{const u=new Set(set.flatMap(ids));return !ids(j).some(i=>u.has(i))};
-  const per=Math.max(1,Math.ceil(allFoods.size/n));const score=set=>{let s=set.reduce((a,j)=>a+j.total,0)+set.length*40;const used=new Set(set.flatMap(ids));s+=used.size*5-(allFoods.size-used.size)*2;for(const j of set)if(ids(j).length>per)s-=10*(ids(j).length-per);
+  const per=Math.max(1,Math.ceil(allFoods.size/n));const score=set=>{let s=set.reduce((a,j)=>a+j.total,0)+set.length*40;const used=new Set(set.flatMap(ids));s+=used.size*5;for(const x of allFoods)if(!used.has(x))s-=isMeatId(x)&&rootOf(x)!=='jd'?14:4;for(const j of set)if(typeof NAMES!=='undefined'&&NAMES[ids(j).slice().sort().join('+')+'|'+j.spec.style])s+=6;for(const j of set)if(ids(j).length>per)s-=10*(ids(j).length-per);
     const st={},me={};for(const j of set){st[j.spec.style]=(st[j.spec.style]||0)+1;const m=autoMethod(j.spec.foods,j.spec.style);me[m]=(me[m]||0)+1}
     for(const k in st)if(st[k]>1)s-=22*(st[k]-1);for(const k in me)if(me[k]>2)s-=6*(me[k]-2);
     const sp=set.filter(j=>SPICY_STYLES.includes(j.spec.style)).length;if(!(opt.pref&&opt.pref.spicy==='重辣')&&sp>Math.ceil(set.length/2))s-=8*(sp-Math.ceil(set.length/2));
@@ -2027,16 +2083,33 @@ function book(){try{return JSON.parse(localStorage.getItem('tw.book')||'[]')}cat
 function bookPut(B){try{localStorage.setItem('tw.book',JSON.stringify(B));return true}catch(e){return false}}
 function bookSave(o){const B=book();B.unshift(Object.assign({id:'b'+Date.now().toString(36),t:Date.now()},o));bookPut(B);bookRender()}
 window.bookSave=bookSave;
-function bookRender(){const B=book();const box=$('blist');
+let openFb='';
+function bookRender(){const B=book();const box=$('blist');let dirty=false;for(const b of B)if(rateOf(b)&&!b.snap){try{b.snap=snapOf(b);dirty=true}catch(e){}}if(dirty)bookPut(B);profRender(B);
   box.innerHTML=B.length?B.map(b=>{let info='';try{const ev=evaluate(simulate(b.steps),b.fin,b.eat);info=flavorTypes(ev.D,ev.flags)[0][0]+' · 咸 '+ev.D.salt.toFixed(1)+' · 甜 '+ev.D.sweet.toFixed(1)+' · 辣 '+ev.D.spicy.toFixed(1)}catch(e){}
-    const base=recipeById(b.base);return `<div class="bcard" data-id="${b.id}"><b>${esc(b.name)}</b><span class="note">${new Date(b.t).toLocaleDateString()}${base?' · 基于 '+esc(base.name):''}</span><span>${esc(info)}</span>${b.note?`<span class="note">${esc(b.note)}</span>`:''}
-     <div class="fl"><button class="btn sm" data-a="open">在工坊打开</button><button class="btn sm" data-a="card">菜谱卡</button><button class="btn sm" data-a="del">删除</button></div></div>`}).join(''):'<p class="note">还没有保存的菜谱。在“菜谱工坊”里改良后点“存进我的菜谱”，或在菜谱卡里保存。</p>'}
+    const base=recipeById(b.base);const r=rateOf(b);const s=r?r.s:0;
+    return `<div class="bcard" data-id="${b.id}"><b>${esc(b.name)}</b><span class="note">${new Date(b.t).toLocaleDateString()}${base?' · 基于 '+esc(base.name):''}</span><span>${esc(info)}</span>${b.note?`<span class="note">${esc(b.note)}</span>`:''}
+     <div class="fl" style="gap:6px"><span class="stars" role="group" aria-label="打分">${[1,2,3,4,5].map(k=>`<button data-star="${k}" class="${k<=s?'on':''}" aria-label="${k} 星">★</button>`).join('')}</span><span class="note">${r?`${['','难吃','一般偏差','还行','好吃','超好吃'][s]} · 打过 ${b.rates.length} 次`:'做过了？打个分'}</span></div>
+     ${r||openFb===b.id?`<details ${openFb===b.id?'open':''}><summary>哪里不对？点选反馈${r&&r.tags&&r.tags.length?`（${esc(r.tags.join('、'))}）`:''}</summary><div class="fbk">${FB.map(x=>`<button data-tag="${x[0]}" aria-pressed="${!!(r&&r.tags&&r.tags.includes(x[0]))}">${x[0]}</button>`).join('')}</div></details>`:''}
+     <div class="fl"><button class="btn sm" data-a="open">在工坊打开</button><button class="btn sm" data-a="card">菜谱卡</button>${r&&(r.tags&&r.tags.length||r.s<=3)?'<button class="btn sm pri" data-a="fix">按打分改良</button>':''}<button class="btn sm" data-a="del">删除</button></div></div>`}).join(''):'<p class="note">还没有保存的菜谱。在“菜谱工坊”里改良后点“存进我的菜谱”，或在菜谱卡里保存。</p>'}
+$('blist').addEventListener('click',e=>{const st=e.target.closest('button[data-star],button[data-tag]');if(!st)return;e.stopPropagation();const id=st.closest('.bcard').dataset.id;const B=book();const r=B.find(x=>x.id===id);if(!r)return;
+  r.rates=r.rates||[];let last=r.rates[r.rates.length-1];const today=new Date().toDateString();if(!last||new Date(last.t).toDateString()!==today){last={s:3,tags:[],t:Date.now()};r.rates.push(last);if(r.rates.length>20)r.rates.shift()}
+  if(st.dataset.star){last.s=+st.dataset.star;openFb=id}else{const t=st.dataset.tag;const i=last.tags.indexOf(t);if(i>=0)last.tags.splice(i,1);else{const f=FB.find(x=>x[0]===t);last.tags=last.tags.filter(o=>{const g=FB.find(x=>x[0]===o);return !(g&&f&&g[1]===f[1]&&g[1]!=='tex'&&g[2]!==f[2])});last.tags.push(t)}openFb=id}
+  last.t=Date.now();try{r.snap=snapOf(r)}catch(err){}bookPut(B);bookRender()},true);
+function profRender(B){const L=learnProfile(B);const box=$('bprof');if(!L.n){box.innerHTML='';return}const T=profileText(L);
+  const tx={嫩:'肉要嫩',烂:'肉要软烂',脆:'菜要脆',软:'菜要软'};
+  box.innerHTML=`<div class="prof"><b>我的口味画像</b><span class="note"> · 从 ${L.n} 道打过分的菜学来</span><div style="margin-top:6px">${T.lines.length?T.lines.map(x=>`<span class="tg${x.strong?' s':''}">${esc(x.w)}${x.strong?'很多':'一点'}</span>`).join(''):'<span class="note">口味和标准做法差不多，再多打几道就更准了</span>'}${[T.meat,T.veg].filter(Boolean).map(v=>`<span class="tg">${tx[v]}</span>`).join('')}</div>
+   ${T.likes.length?`<div class="note" style="margin-top:4px">爱吃：${esc(T.likes.join('、'))}${T.foods.length?' · 爱吃的食材：'+esc(T.foods.join('、')):''}</div>`:''}${T.dislikes.length?`<div class="note">不太爱：${esc(T.dislikes.join('、'))}</div>`:''}
+   <div class="fl" style="margin-top:8px"><button class="btn sm pri" id="plearn">按我的口味设计新菜</button></div></div>`;
+  $('plearn').onclick=()=>{if(window.useLearn)window.useLearn();location.hash='ai'}}
+window.bookAll=book;
 $('blist').onclick=e=>{const b=e.target.closest('button[data-a]');if(!b)return;const id=b.closest('.bcard').dataset.id;const B=book();const r=B.find(x=>x.id===id);if(!r)return;
   if(b.dataset.a==='open'){window.openInEditor({dish:r.base||'',steps:JSON.parse(JSON.stringify(r.steps)),fin:r.fin,eat:r.eat,custom:r.name});location.hash='remix'}
   if(b.dataset.a==='card')openCard(r.name,r.steps,r.fin,r.eat,r.note||'');
+  if(b.dataset.a==='fix'){const rr=rateOf(r);const P=Object.assign(rateToPrefs(rr));b.disabled=true;b.textContent='改良中…';
+    setTimeout(()=>{try{const x=improve(r.steps,r.fin,r.eat,P,2500);const log=x.log.slice(0,5).map(l=>l[1]).join('；');openCard(r.name.replace(/（改良版）$/,'')+'（改良版）',x.steps,r.fin,r.eat,`按你的打分（${rr.s} 星${rr.tags&&rr.tags.length?'，'+rr.tags.join('、'):''}）改良：${log||'原配方已经很接近，只做了微调'}`)}catch(err){console.error(err)}b.disabled=false;b.textContent='按打分改良'},30)}
   if(b.dataset.a==='del'){if(b.dataset.sure){bookPut(B.filter(x=>x.id!==id));bookRender()}else{b.dataset.sure=1;b.textContent='再点一次删除'}}};
 $('bcopy').onclick=async()=>{const t=JSON.stringify(book());try{await navigator.clipboard.writeText(t);$('bmsg').textContent='已复制全部菜谱'}catch(e){$('bimp').value=t;$('bmsg').textContent='复制被拦截，已放进文本框'}};
-$('bdoimp').onclick=()=>{try{const L=JSON.parse($('bimp').value);if(!Array.isArray(L))throw 0;const ok=L.filter(b=>b&&b.name&&Array.isArray(b.steps)&&b.steps.every(s=>s.t!=='add'||IT[s.id]||FD[s.id])).map(b=>({id:'b'+Math.random().toString(36).slice(2,8),t:+b.t||Date.now(),name:String(b.name).slice(0,60),steps:b.steps,fin:['pot','A','B','C'].includes(b.fin)?b.fin:'pot',eat:b.eat==='drain'?'drain':'all',base:b.base||'',note:String(b.note||'').slice(0,200)}));bookPut(ok.concat(book()));bookRender();$('bmsg').textContent=`导入 ${ok.length} 个`}catch(e){$('bmsg').textContent='无法识别'}};
+$('bdoimp').onclick=()=>{try{const L=JSON.parse($('bimp').value);if(!Array.isArray(L))throw 0;const ok=L.filter(b=>b&&b.name&&Array.isArray(b.steps)&&b.steps.every(s=>s.t!=='add'||IT[s.id]||FD[s.id])).map(b=>({id:'b'+Math.random().toString(36).slice(2,8),t:+b.t||Date.now(),name:String(b.name).slice(0,60),steps:b.steps,fin:['pot','A','B','C'].includes(b.fin)?b.fin:'pot',eat:b.eat==='drain'?'drain':'all',base:b.base||'',note:String(b.note||'').slice(0,200),style:STYLES[b.style]?b.style:'',method:METHODS_D.includes(b.method)?b.method:'',rates:Array.isArray(b.rates)?b.rates.filter(x=>x&&x.s>=1&&x.s<=5).map(x=>({s:Math.round(x.s),t:+x.t||Date.now(),tags:(Array.isArray(x.tags)?x.tags:[]).filter(t=>FB.some(f=>f[0]===t))})).slice(-20):undefined}));bookPut(ok.concat(book()));bookRender();$('bmsg').textContent=`导入 ${ok.length} 个`}catch(e){$('bmsg').textContent='无法识别'}};
 window.bookShow=bookRender;
 try{render()}catch(e){}
 }
@@ -2068,7 +2141,7 @@ $('v-ai').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   else return;saveSpec();render()});
 $('afsel').addEventListener('change',e=>{const row=e.target.closest('.afrow');if(!row)return;const f=spec.foods[+row.dataset.i];if(e.target.tagName==='SELECT')f.cut=e.target.value;else f.g=Math.max(20,+e.target.value||100);saveSpec()});
 $('ago').onclick=()=>{$('ago').disabled=true;$('astat').textContent='正在试做几十个版本…';
-  setTimeout(()=>{try{const r=design(spec,3500);show(r,'程序设计')}catch(err){console.error(err);$('astat').textContent='设计失败'}$('ago').disabled=false},30)};
+  setTimeout(()=>{try{const L=myLearn();const sp=Object.assign({},spec,spec.learn!==false&&L.n?{pref:{learn:L},meat:spec.meat||L.meat,veg:spec.veg||L.veg}:{});const r=design(sp,3500);show(r,spec.learn!==false&&L.n?'程序设计 · 按你的打分调过口味':'程序设计')}catch(err){console.error(err);$('astat').textContent='设计失败'}$('ago').disabled=false},30)};
 function show(r,who){res=r;$('ares').hidden=false;$('astat').textContent=r.ms?`${who} · 试算 ${(r.ms/1000).toFixed(1)} 秒`:who;
   $('aname').textContent=r.name;$('ascore').innerHTML=`${r.score}<small> 分 完美度</small>`;
   const ft=flavorTypes(r.r.ev.D,r.r.ev.flags);$('atypes').innerHTML=ft.map((t,i)=>`<span class="tag${i?'':' main'}">${esc(t[0])}</span>`).join('')+`<span class="tag">${esc(r.spec.method)}</span><span class="tag">${r.r.ev.color.name}</span>`;
@@ -2078,7 +2151,7 @@ function show(r,who){res=r;$('ares').hidden=false;$('astat').textContent=r.ms?`$
   const w=r.r.W.filter(x=>x[0]>=1).map(x=>x[1]);$('awarn').textContent=w.length?'提醒：'+w.slice(0,3).join(' '):'';
   $('ares').scrollIntoView({behavior:'smooth',block:'start'})}
 $('aopen').onclick=()=>{if(!res)return;window.openInEditor({dish:'',steps:JSON.parse(JSON.stringify(res.steps)),fin:res.fin,eat:res.eat,custom:res.name});location.hash='remix'};
-$('asave').onclick=()=>{if(!res)return;bookSave({name:res.name,steps:res.steps,fin:res.fin,eat:res.eat,base:'',note:'AI 设计 · '+res.spec.style+' · '+res.spec.method});$('astat').textContent='已存进“我的菜谱”'};
+$('asave').onclick=()=>{if(!res)return;bookSave({name:res.name,steps:res.steps,fin:res.fin,eat:res.eat,base:'',style:res.spec.style,method:res.spec.method,note:'AI 设计 · '+res.spec.style+' · '+res.spec.method});$('astat').textContent='已存进“我的菜谱”'};
 $('acardbtn').onclick=()=>{if(res)openCard(res.name,res.steps,res.fin,res.eat,'AI 设计 · '+res.spec.style)};
 $('aalt').onclick=()=>{$('aalt').disabled=true;$('aalts').textContent='正在比较各种做法…';
   setTimeout(()=>{const L=[];for(const m of METHODS_D.slice(1)){try{const r=design(Object.assign({},spec,{method:m}),900);L.push(r)}catch(e){}}L.sort((a,b)=>b.score-a.score);
@@ -2086,14 +2159,21 @@ $('aalt').onclick=()=>{$('aalt').disabled=true;$('aalts').textContent='正在比
     $('aalts').onclick=e=>{const b=e.target.closest('button');if(b)show(L[+b.dataset.k],'程序设计')}},30)};
 
 // ---- 冰箱模式 ----
-let F={foods:[],pref:{spicy:'中辣',sweet:'',sour:'',numb:'',heavy:''},time:0,pantryOnly:false,pantry:PANTRY.slice(),cons:{},n:3,soup:true};let menuJobs=null,menuSet=null,menuOut=null,menuTried=[];let ffcat='肉';let fres=[];
+let F={foods:[],pref:{spicy:'中辣',sweet:'',sour:'',numb:'',heavy:''},time:0,pantryOnly:false,pantry:PANTRY.slice(),cons:{},n:3,soup:true,learn:true};let menuJobs=null,menuSet=null,menuOut=null,menuTried=[];let ffcat='肉';let fres=[];
 try{const s=JSON.parse(localStorage.getItem('tw.fridge')||'null');if(s&&Array.isArray(s.foods))F=Object.assign(F,s)}catch(e){}
 const saveF=()=>{try{localStorage.setItem('tw.fridge',JSON.stringify(F))}catch(e){}};
 let amode='fridge';try{amode=localStorage.getItem('tw.aimode')||'fridge'}catch(e){}
 function setMode(m){amode=m;$('pfridge').hidden=m!=='fridge';$('pspec').hidden=m!=='spec';$('aimode').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===m));try{localStorage.setItem('tw.aimode',m)}catch(e){}}
 $('aimode').onclick=e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.v)};
+const myLearn=()=>{try{return learnProfile(window.bookAll?window.bookAll():[])}catch(e){return{n:0}}};
+const curPref=()=>{const L=myLearn();return Object.assign({},F.pref,{learn:F.learn&&L.n?L:null})};
+function learnNote(){const p=curPref();if(!p.learn)return'';const T=profileText(p.learn);const w=T.lines.slice(0,3).map(x=>x.w).concat(T.likes.slice(0,2).map(x=>'爱'+x));return w.length?` · 已按你的打分调口味（${w.join('、')}）`:` · 已参考你的 ${p.learn.n} 次打分`}
+function learnUI(){const L=myLearn();const T=profileText(L);const t=L.n?`按我的打分调口味（已学 ${L.n} 道${T.lines.length?'：'+T.lines.slice(0,3).map(x=>x.w).join('、'):''}）`:'按我的打分调口味（先去“我的菜谱”给做过的菜打分）';
+  for(const [c,s,v] of [['flearn','flearnt',F.learn],['alearn','alearnt',spec.learn!==false]]){$(c).disabled=!L.n;$(c).checked=!!(L.n&&v);$(s).textContent=t}}
+window.useLearn=()=>{F.learn=true;spec.learn=true;saveF();try{saveSpec()}catch(e){}setMode('fridge');learnUI()};
+$('flearn').onchange=e=>{F.learn=e.target.checked;saveF()};$('alearn').onchange=e=>{spec.learn=e.target.checked;try{saveSpec()}catch(er){}};
 const PREFS=[['spicy','辣',['不辣','微辣','中辣','重辣']],['sweet','甜',['不爱甜','','爱甜']],['sour','酸',['','爱酸']],['numb','麻',['怕麻','','爱麻']],['heavy','口味',['清淡','','重口']]];
-function frender(){
+function frender(){learnUI();
   $('ffcats').innerHTML=FCATS.map(c=>`<button data-fc="${c}" aria-pressed="${c===ffcat}">${c}</button>`).join('');
   $('ffgrid').innerHTML=Object.values(FD).filter(d=>d.cat===ffcat).map(d=>`<button data-ff="${d.id}" aria-pressed="${F.foods.some(f=>f.id===d.id)}">${esc(d.name)}</button>`).join('');
   $('ffsel').innerHTML=F.foods.length?F.foods.map((f,i)=>`<div class="afrow" data-i="${i}"><b>${esc(FD[f.id].name)}</b><input type="number" min="20" step="50" value="${f.g}" aria-label="克数"><span class="unit">g</span><span></span><button class="x" aria-label="移除">✕</button></div>`).join(''):'<p class="note">还没有食材。</p>';
@@ -2139,32 +2219,34 @@ $('fparse').onclick=()=>{const t=$('ftext').value;const r=parseFoodsX(t);addFood
   unk=[...new Set(unk.concat(r.unknown))];
   $('fstat').textContent=parts.length?'识别出：'+parts.join('、'):(r.unknown.length?'':'没识别出食材，可以直接点选');$('ftext').value='';saveF();frender();unkRender()};
 $('ftext').addEventListener('keydown',e=>{if(e.key==='Enter')$('fparse').click()});
-$('fgo').onclick=()=>{if(!F.foods.length)return;$('fgo').disabled=true;$('frec').innerHTML='';const input={foods:F.foods,pref:F.pref,pantryOnly:F.pantryOnly,pantry:F.pantry,cons:F.cons};
+$('fgo').onclick=()=>{if(!F.foods.length)return;$('fgo').disabled=true;$('frec').innerHTML='';const input={foods:F.foods,pref:curPref(),pantryOnly:F.pantryOnly,pantry:F.pantry,cons:F.cons};
   const plan=fridgePlan(input);const jobs=plan.jobs;let i=0;$('fstat').textContent=`共 ${jobs.length} 种搭配，正在快速试做…`;
   const step1=()=>{const t0=Date.now();while(i<jobs.length&&Date.now()-t0<120){try{quickEval(jobs[i])}catch(e){jobs[i].total=-1}i++}
     $('fstat').textContent=`快速试做 ${i}/${jobs.length}…`;if(i<jobs.length)return setTimeout(step1,0);
+    const RL=refineList(jobs,36);let ri=0;const stepR=()=>{const t0=Date.now();while(ri<RL.length&&Date.now()-t0<150){try{refineJob(RL[ri])}catch(e){}ri++}$('fstat').textContent=`调准用量 ${ri}/${RL.length}…`;if(ri<RL.length)return setTimeout(stepR,0);after()};stepR()};
+  const after=()=>{
     const lim=+F.time;const ok=jobs.filter(j=>j.total>=0&&(!lim||j.t<=lim*1.3));
     if((F.n||1)>1)return makeMenu(ok);
     const top=pickTop(ok,7);if(!top.length){$('fstat').textContent=lim?'这个时间内做不出来，放宽时间试试':'没有合适的搭配';$('fgo').disabled=false;return}
     let k=0;const out=[];const step2=()=>{const j=top[k];$('fstat').textContent=`细调第 ${k+1}/${top.length} 道：${STYLES[j.spec.style].pre}…`;
       setTimeout(()=>{try{const r=design(j.spec,700);if(!lim||r.r.sim.t<=lim)out.push({r,j,total:tasty(j,r.score)})}catch(e){console.error(e)}k++;if(k<top.length)step2();else done(out)},0)};step2()};
-  const done=(out)=>{out=out.filter(x=>x.total>=60).sort((a,b)=>b.total-a.total).slice(0,6);fres=out;$('fgo').disabled=false;$('fstat').textContent=out.length?`推荐 ${out.length} 道，点“看做法”展开`:'没有合适的搭配，试试放宽时间或口味';
+  const done=(out)=>{out=out.filter(x=>x.total>=60).sort((a,b)=>b.total-a.total).slice(0,6);fres=out;$('fgo').disabled=false;$('fstat').textContent=out.length?`推荐 ${out.length} 道，点“看做法”展开`+learnNote():'没有合适的搭配，试试放宽时间或口味';
     $('frec').innerHTML=out.map((x,n)=>`<div class="frow${n?'':' first'}"><div class="fs">${x.total}<small>好吃度</small></div><div><b>${esc(x.r.name)}</b><span class="note">${esc(x.r.spec.style)} · ${esc(x.r.spec.method)} · 约 ${Math.max(1,Math.round(x.r.r.sim.t/60))} 分钟 · 完美度 ${x.r.score}</span><span class="note">${esc(reason(x.j))}</span></div><div class="fl" style="flex-direction:column;align-items:stretch"><button class="btn sm pri" data-fv="${n}">看做法</button><button class="btn sm" data-fs="${n}">存</button></div></div>`).join('')};
   step1()};
 $('frec').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.fv!=null){const x=fres[+b.dataset.fv];show(x.r,`冰箱推荐 · 好吃度 ${x.total}`)}
-  if(b.dataset.fs!=null){const x=fres[+b.dataset.fs];bookSave({name:x.r.name,steps:x.r.steps,fin:x.r.fin,eat:x.r.eat,base:'',note:'冰箱推荐 · '+x.r.spec.style+' · '+x.r.spec.method});b.textContent='已存'}});
+  if(b.dataset.fs!=null){const x=fres[+b.dataset.fs];bookSave({name:x.r.name,steps:x.r.steps,fin:x.r.fin,eat:x.r.eat,base:'',style:x.r.spec.style,method:x.r.spec.method,note:'冰箱推荐 · '+x.r.spec.style+' · '+x.r.spec.method});b.textContent='已存'}});
 setMode(amode);
 
 // ---- 一桌菜 ----
-function makeMenu(jobs){menuJobs=jobs;menuTried=[];const set=menuPlan(jobs,F.n,{soup:F.soup,pref:F.pref});if(!set.length){$('fstat').textContent='没有合适的搭配';$('fgo').disabled=false;return}
+function makeMenu(jobs){menuJobs=jobs;menuTried=[];const set=menuPlan(jobs,F.n,{soup:F.soup,pref:curPref()});if(!set.length){$('fstat').textContent='没有合适的搭配';$('fgo').disabled=false;return}
   menuSet=set;menuOut=[];let k=0;const nx=()=>{const j=set[k];$('fstat').textContent=`细调第 ${k+1}/${set.length} 道…`;setTimeout(()=>{try{const r=design(j.spec,700);menuOut[k]={r,j,total:tasty(j,r.score)}}catch(e){console.error(e)}k++;if(k<set.length)nx();else renderMenu()},0)};nx()}
 function renderMenu(){$('fgo').disabled=false;const out=menuOut.filter(Boolean);fres=out;
   const used=new Set(out.flatMap(x=>x.j.spec.foods.map(f=>f.id)));const left=F.foods.filter(f=>!used.has(f.id)).map(f=>FD[f.id].name.split('/')[0]);
   const mo=menuOrder(out.map(x=>({name:x.r.name,t:x.r.r.sim.t})));const avg=Math.round(out.reduce((a,x)=>a+x.total,0)/out.length);
-  $('fstat').textContent=out.length<F.n?`食材只够配 ${out.length} 道`:'';
+  $('fstat').textContent=(out.length<F.n?`食材只够配 ${out.length} 道`:'')+learnNote();
   $('frec').innerHTML=`<div class="mhead"><b>一桌 ${out.length} 道菜</b><span class="note">平均好吃度 ${avg} · 用了 ${used.size}/${F.foods.length} 样食材 · 全部做完约 ${Math.round(mo.total/60)} 分钟${left.length?` · 没用上：${esc(left.join('、'))}`:''}</span><p style="margin:6px 0 0;font-size:15px">${mo.lines.map(esc).join('<br>')}</p><div class="fl" style="margin-top:8px"><button class="btn sm" id="msave">整桌存进我的菜谱</button><button class="btn sm" id="mcopy">复制整桌菜谱</button><span class="note" id="mmsg"></span></div></div>`+
    out.map((x,n)=>`<div class="frow"><div class="fs">${x.total}<small>好吃度</small></div><div><b>${esc(x.r.name)}</b><span class="note">${esc(x.r.spec.style)} · ${esc(x.r.spec.method)} · 约 ${Math.max(1,Math.round(x.r.r.sim.t/60))} 分钟 · 用 ${esc(x.j.spec.foods.map(f=>FD[f.id].name.split('/')[0]+' '+f.g+'g').join('、'))}</span><span class="note">${esc(reason(x.j))}</span></div><div class="fl" style="flex-direction:column;align-items:stretch"><button class="btn sm pri" data-fv="${n}">看做法</button><button class="btn sm" data-mswap="${n}">换一道</button></div></div>`).join('');
-  $('msave').onclick=()=>{for(const x of out)bookSave({name:x.r.name,steps:x.r.steps,fin:x.r.fin,eat:x.r.eat,base:'',note:`一桌菜 · ${out.map(o=>o.r.name).join('、')}`});$('mmsg').textContent='已存 '+out.length+' 道'};
+  $('msave').onclick=()=>{for(const x of out)bookSave({name:x.r.name,steps:x.r.steps,fin:x.r.fin,eat:x.r.eat,base:'',style:x.r.spec.style,method:x.r.spec.method,note:`一桌菜 · ${out.map(o=>o.r.name).join('、')}`});$('mmsg').textContent='已存 '+out.length+' 道'};
   $('mcopy').onclick=async()=>{const t=[`【一桌 ${out.length} 道菜】`,...mo.lines,''].concat(out.map(x=>cardText(x.r.name,recipeCard(x.r.steps),''))).join('\n\n');try{await navigator.clipboard.writeText(t);$('mmsg').textContent='已复制'}catch(e){$('mmsg').textContent='复制被拦截'}}}
 $('frec').addEventListener('click',e=>{const b=e.target.closest('button[data-mswap]');if(!b||!menuSet)return;const i=+b.dataset.mswap;menuTried[i]=menuTried[i]||new Set();menuTried[i].add(menuSet[i]);let opts=swapOptions(menuJobs,menuSet,i,{}).filter(j=>!menuTried[i].has(j));
   if(!opts.length){if(menuTried[i].size>1){menuTried[i]=new Set([menuSet[i]]);opts=swapOptions(menuJobs,menuSet,i,{})}}
@@ -2215,6 +2297,7 @@ $('achef').onclick=chef;
 (function hook(n){if(window.claude&&typeof window.claude.use==='function'){window.claude.use('sample').then(fn=>{if(fn){sampleFn=fn;$('achef').hidden=false;$('achefnote').hidden=false}}).catch(()=>{});return}if(n<20)setTimeout(()=>hook(n+1),250)})(0);
 window.aiShow=()=>{render();frender();if(res){radarSVG($('aradar').querySelector('svg'),DIMS,res.r.ev.D,res.T)}};
 }
+window.addEventListener('hashchange',()=>{if(location.hash==='#ai')try{learnUI()}catch(e){}});
 
 // ===== 从零下厨：实时灶台 =====
 {

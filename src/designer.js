@@ -107,7 +107,7 @@ function design(spec,budgetMs){const t0=Date.now();budgetMs=budgetMs||3500;spec=
   const fin=spec.method==='蒸'?'C':spec.method==='凉拌'?'B':'pot';const eat=spec.style==='五香卤'?'drain':'all';
   let amt={};const ev=a=>{let S=buildSteps(spec,a);const r=runEval(S,fin,eat);return{S,r,L:designScore(r,T,spec)}};
   return designSearch(spec,T,fin,eat,amt,ev,t0,budgetMs)}
-function designTarget(spec){const T=styleTarget(spec.style);if(spec.method==='凉拌'){if(spec.style==='蒜香'){T.pungent=5;T.wok=0;T.roast=1.5}T.wok=Math.min(T.wok,1);T.roast=Math.min(T.roast,2)}if(spec.method==='蒸')T.wok=Math.min(T.wok,1.5);if(spec.cons&&spec.cons.lowSalt)T.salt=Math.max(3.8,T.salt-1.2);if(spec.cons&&spec.cons.lowSugar)T.sweet=Math.max(0,T.sweet-2);if(spec.cons&&spec.cons.noSpicy){T.spicy=0}if(spec.pref&&typeof prefTarget==='function')prefTarget(T,spec.pref);return T}
+function designTarget(spec){const T=styleTarget(spec.style);if(spec.method==='凉拌'){if(spec.style==='蒜香'){T.pungent=5;T.wok=0;T.roast=1.5}T.wok=Math.min(T.wok,1);T.roast=Math.min(T.roast,2)}if(spec.method==='蒸')T.wok=Math.min(T.wok,1.5);if(spec.cons&&spec.cons.lowSalt)T.salt=Math.max(3.8,T.salt-1.2);if(spec.cons&&spec.cons.lowSugar)T.sweet=Math.max(0,T.sweet-2);if(spec.cons&&spec.cons.noSpicy){T.spicy=0}if(spec.pref&&typeof prefTarget==='function')prefTarget(T,spec.pref,spec.style);return T}
 function designSearch(spec,T,fin,eat,amt,ev,t0,budgetMs){
   let best=ev(amt);let iter=0;const ids=[...new Set(STYLES[spec.style].kit.map(x=>x[0]).concat(['zyc']))];
   const knobs=['_t','_v','_oil','_T','_p','_w'];

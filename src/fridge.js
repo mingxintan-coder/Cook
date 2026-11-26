@@ -58,10 +58,10 @@ function combos(foods){const ids=foods.map(f=>f.id);const M=ids.filter(isMeatId)
   for(const m of M)for(let a=0;a<V.length;a++)for(let b=a+1;b<V.length;b++)C.push([m,V[a],V[b]]);
   if(M.includes('jd'))for(const v of V)C.push(['jd',v]);
   const seen=new Set();return C.filter(c=>{const k=c.slice().sort().join('+');if(seen.has(k))return false;seen.add(k);return true})}
-function prefTarget(T,pref){const P=pref||{};const sp={'不辣':-9,'微辣':-1,'中辣':0,'重辣':1.5}[P.spicy||'中辣']||0;if(sp<-5)T.spicy=0;else T.spicy=Math.max(0,Math.min(9,T.spicy+sp*1.2));
+function prefTarget(T,pref,style){const P=pref||{};const sp={'不辣':-9,'微辣':-1,'中辣':0,'重辣':1.5}[P.spicy||'中辣']||0;if(sp<-5)T.spicy=0;else T.spicy=Math.max(0,Math.min(9,T.spicy+sp*1.2));
   if(P.sweet==='爱甜')T.sweet=Math.min(9,T.sweet+1.2);if(P.sweet==='不爱甜')T.sweet=Math.max(0,T.sweet-1.5);
   if(P.sour==='爱酸')T.sour=Math.min(9,T.sour+1.2);if(P.numb==='怕麻')T.numb=Math.min(T.numb,1);if(P.numb==='爱麻')T.numb=Math.min(9,T.numb+1.5);
-  if(P.heavy==='清淡'){T.salt=Math.max(3.8,T.salt-1);T.rich=Math.max(0,(T.rich||0)-1)}if(P.heavy==='重口')T.salt=Math.min(6.6,T.salt+.4);return T}
+  if(P.heavy==='清淡'){T.salt=Math.max(3.8,T.salt-1);T.rich=Math.max(0,(T.rich||0)-1)}if(P.heavy==='重口')T.salt=Math.min(6.6,T.salt+.4);if(P.learn&&typeof learnTarget==='function')learnTarget(T,P.learn,style);return T}
 function prefScore(style,pref,D){const P=pref||{};let s=5;const spicy=SPICY_STYLES.includes(style);
   if(P.spicy==='不辣')s+=spicy?-10:3;if(P.spicy==='重辣')s+=spicy?4:-3;
   if(P.sweet==='爱甜'&&['糖醋','红烧','鱼香'].includes(style))s+=3;if(P.sweet==='不爱甜'&&['糖醋','红烧'].includes(style))s-=4;
@@ -75,13 +75,17 @@ function fridgePlan(input){const foods=input.foods.filter(f=>FD[f.id]);if(!foods
   for(const c of combos(foods))for(const style of Object.keys(STYLES)){
     if(input.pref&&input.pref.spicy==='不辣'&&['麻辣','宫保','酸辣','家常'].includes(style))continue;
     if(style==='汤'&&c.some(id=>rootOf(id)==='jd')&&c.some(id=>isMeatId(id)&&FD[id].coll>=30))continue;
+    if(style==='汤'&&c.some(id=>fitScore('汤',[id])<.6))continue;
     if(!canStyle(style,pantry))continue;if(style==='茄汁'&&(!c.includes('fq')||c.length<2))continue;const fit=fitScore(style,c);if(fit<.55)continue;
-    const spec={foods:c.map(id=>({id,g:gOf[id]||defaultG(id,c)})),style,method:'自动',meat:'',veg:'',cons:Object.assign({},input.cons||{},input.pref&&input.pref.spicy==='不辣'?{noSpicy:true}:{}),missing,pref:input.pref};
-    jobs.push({spec,fit,pair:pairScore(c),ps:prefScore(style,input.pref)})}
+    const L=input.pref&&input.pref.learn;const spec={foods:c.map(id=>({id,g:gOf[id]||defaultG(id,c)})),style,method:'自动',meat:L&&L.meat||'',veg:L&&L.veg||'',cons:Object.assign({},input.cons||{},input.pref&&input.pref.spicy==='不辣'?{noSpicy:true}:{}),missing,pref:input.pref};
+    jobs.push({spec,fit,pair:pairScore(c),ps:prefScore(style,input.pref)+(L&&typeof learnBonus==='function'?learnBonus(L,style,c,''):0)})}
   return{jobs,missing}}
-function quickEval(job){const spec=Object.assign({},job.spec);spec.method=autoMethod(spec.foods,spec.style);const T=prefTarget(designTarget(spec),spec.pref);
+function quickEval(job){const spec=Object.assign({},job.spec);spec.method=autoMethod(spec.foods,spec.style);const T=designTarget(spec);if(spec.pref&&spec.pref.learn&&!job._lm){job._lm=1;job.ps+=spec.pref.learn.method[spec.method]||0}
   const fin=spec.method==='蒸'?'C':spec.method==='凉拌'?'B':'pot';const eat=spec.style==='五香卤'?'drain':'all';
   const S=buildSteps(spec,{});const r=runEval(S,fin,eat);const L=designScore(r,T,spec);job.q=Math.max(0,100-L*3);job.t=r.sim.t;job.total=tasty(job,job.q);return job}
+// 第二轮：快速筛完后挑最有希望的几十个，用短搜索把用量调准再排名（默认用量常常差很多）
+function refineList(jobs,k){return jobs.filter(j=>j.total>=0).map(j=>[j,j.fit*28+j.pair+j.ps+.55*Math.max(j.q||0,78)]).sort((a,b)=>b[1]-a[1]).slice(0,k||36).map(x=>x[0])}
+function refineJob(j,ms){const r=design(j.spec,ms||35);j.q=Math.max(j.q||0,r.score);j.t=r.r.sim.t;j.total=tasty(j,j.q);return j}
 function tasty(job,perfect){return Math.round(Math.max(0,Math.min(100,perfect*.55+job.fit*28+job.pair+job.ps+2)))}
 function pickTop(jobs,n){const L=jobs.filter(j=>j.total>=55).sort((a,b)=>b.total-a.total);const out=[];const perCombo={},perFood={},perStyle={};
   for(const j of L){const ids=j.spec.foods.map(f=>f.id);const ck=ids.slice().sort().join('+');const st=j.spec.style;
@@ -93,7 +97,7 @@ function pickTop(jobs,n){const L=jobs.filter(j=>j.total>=55).sort((a,b)=>b.total
 function menuPlan(jobs,n,opt){opt=opt||{};const C=jobs.filter(j=>j.total>=30).sort((a,b)=>b.total-a.total).slice(0,90);const allFoods=new Set(jobs.flatMap(j=>j.spec.foods.map(f=>f.id)));
   const ids=j=>j.spec.foods.map(f=>f.id);const isSoup=j=>j.spec.style==='汤';const meatDish=j=>ids(j).some(isMeatId);
   const ok=(set,j)=>{const u=new Set(set.flatMap(ids));return !ids(j).some(i=>u.has(i))};
-  const per=Math.max(1,Math.ceil(allFoods.size/n));const score=set=>{let s=set.reduce((a,j)=>a+j.total,0)+set.length*40;const used=new Set(set.flatMap(ids));s+=used.size*5-(allFoods.size-used.size)*2;for(const j of set)if(ids(j).length>per)s-=10*(ids(j).length-per);
+  const per=Math.max(1,Math.ceil(allFoods.size/n));const score=set=>{let s=set.reduce((a,j)=>a+j.total,0)+set.length*40;const used=new Set(set.flatMap(ids));s+=used.size*5;for(const x of allFoods)if(!used.has(x))s-=isMeatId(x)&&rootOf(x)!=='jd'?14:4;for(const j of set)if(typeof NAMES!=='undefined'&&NAMES[ids(j).slice().sort().join('+')+'|'+j.spec.style])s+=6;for(const j of set)if(ids(j).length>per)s-=10*(ids(j).length-per);
     const st={},me={};for(const j of set){st[j.spec.style]=(st[j.spec.style]||0)+1;const m=autoMethod(j.spec.foods,j.spec.style);me[m]=(me[m]||0)+1}
     for(const k in st)if(st[k]>1)s-=22*(st[k]-1);for(const k in me)if(me[k]>2)s-=6*(me[k]-2);
     const sp=set.filter(j=>SPICY_STYLES.includes(j.spec.style)).length;if(!(opt.pref&&opt.pref.spicy==='重辣')&&sp>Math.ceil(set.length/2))s-=8*(sp-Math.ceil(set.length/2));
@@ -122,4 +126,4 @@ function menuOrder(items){const L=items.slice().sort((a,b)=>b.t-a.t);const long=
 function reason(job){const fn=job.spec.foods.map(f=>FD[f.id].name.split('/')[0].replace(/\(.*\)/,''));let s=WHY[job.spec.style]||'';
   const ids=job.spec.foods.map(f=>f.id);for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)if(isPair(ids[i],ids[j]))s=`${fn[i]}配${fn[j]}是经典搭配；`+s;
   if(fitScore(job.spec.style,[ids[0]])>=1)s+=`，${fn[0]}最适合这个味型`;return s}
-if(typeof module!=='undefined')module.exports={menuPlan,swapOptions,menuOrder,parseFoodsX,pickTop,parseSeas,parseFoods,fridgePlan,quickEval,tasty,reason,PANTRY};
+if(typeof module!=='undefined')module.exports={refineList,refineJob,menuPlan,swapOptions,menuOrder,parseFoodsX,pickTop,parseSeas,parseFoods,fridgePlan,quickEval,tasty,reason,PANTRY};

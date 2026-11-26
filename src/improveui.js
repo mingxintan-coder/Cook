@@ -59,16 +59,33 @@ function book(){try{return JSON.parse(localStorage.getItem('tw.book')||'[]')}cat
 function bookPut(B){try{localStorage.setItem('tw.book',JSON.stringify(B));return true}catch(e){return false}}
 function bookSave(o){const B=book();B.unshift(Object.assign({id:'b'+Date.now().toString(36),t:Date.now()},o));bookPut(B);bookRender()}
 window.bookSave=bookSave;
-function bookRender(){const B=book();const box=$('blist');
+let openFb='';
+function bookRender(){const B=book();const box=$('blist');let dirty=false;for(const b of B)if(rateOf(b)&&!b.snap){try{b.snap=snapOf(b);dirty=true}catch(e){}}if(dirty)bookPut(B);profRender(B);
   box.innerHTML=B.length?B.map(b=>{let info='';try{const ev=evaluate(simulate(b.steps),b.fin,b.eat);info=flavorTypes(ev.D,ev.flags)[0][0]+' · 咸 '+ev.D.salt.toFixed(1)+' · 甜 '+ev.D.sweet.toFixed(1)+' · 辣 '+ev.D.spicy.toFixed(1)}catch(e){}
-    const base=recipeById(b.base);return `<div class="bcard" data-id="${b.id}"><b>${esc(b.name)}</b><span class="note">${new Date(b.t).toLocaleDateString()}${base?' · 基于 '+esc(base.name):''}</span><span>${esc(info)}</span>${b.note?`<span class="note">${esc(b.note)}</span>`:''}
-     <div class="fl"><button class="btn sm" data-a="open">在工坊打开</button><button class="btn sm" data-a="card">菜谱卡</button><button class="btn sm" data-a="del">删除</button></div></div>`}).join(''):'<p class="note">还没有保存的菜谱。在“菜谱工坊”里改良后点“存进我的菜谱”，或在菜谱卡里保存。</p>'}
+    const base=recipeById(b.base);const r=rateOf(b);const s=r?r.s:0;
+    return `<div class="bcard" data-id="${b.id}"><b>${esc(b.name)}</b><span class="note">${new Date(b.t).toLocaleDateString()}${base?' · 基于 '+esc(base.name):''}</span><span>${esc(info)}</span>${b.note?`<span class="note">${esc(b.note)}</span>`:''}
+     <div class="fl" style="gap:6px"><span class="stars" role="group" aria-label="打分">${[1,2,3,4,5].map(k=>`<button data-star="${k}" class="${k<=s?'on':''}" aria-label="${k} 星">★</button>`).join('')}</span><span class="note">${r?`${['','难吃','一般偏差','还行','好吃','超好吃'][s]} · 打过 ${b.rates.length} 次`:'做过了？打个分'}</span></div>
+     ${r||openFb===b.id?`<details ${openFb===b.id?'open':''}><summary>哪里不对？点选反馈${r&&r.tags&&r.tags.length?`（${esc(r.tags.join('、'))}）`:''}</summary><div class="fbk">${FB.map(x=>`<button data-tag="${x[0]}" aria-pressed="${!!(r&&r.tags&&r.tags.includes(x[0]))}">${x[0]}</button>`).join('')}</div></details>`:''}
+     <div class="fl"><button class="btn sm" data-a="open">在工坊打开</button><button class="btn sm" data-a="card">菜谱卡</button>${r&&(r.tags&&r.tags.length||r.s<=3)?'<button class="btn sm pri" data-a="fix">按打分改良</button>':''}<button class="btn sm" data-a="del">删除</button></div></div>`}).join(''):'<p class="note">还没有保存的菜谱。在“菜谱工坊”里改良后点“存进我的菜谱”，或在菜谱卡里保存。</p>'}
+$('blist').addEventListener('click',e=>{const st=e.target.closest('button[data-star],button[data-tag]');if(!st)return;e.stopPropagation();const id=st.closest('.bcard').dataset.id;const B=book();const r=B.find(x=>x.id===id);if(!r)return;
+  r.rates=r.rates||[];let last=r.rates[r.rates.length-1];const today=new Date().toDateString();if(!last||new Date(last.t).toDateString()!==today){last={s:3,tags:[],t:Date.now()};r.rates.push(last);if(r.rates.length>20)r.rates.shift()}
+  if(st.dataset.star){last.s=+st.dataset.star;openFb=id}else{const t=st.dataset.tag;const i=last.tags.indexOf(t);if(i>=0)last.tags.splice(i,1);else{const f=FB.find(x=>x[0]===t);last.tags=last.tags.filter(o=>{const g=FB.find(x=>x[0]===o);return !(g&&f&&g[1]===f[1]&&g[1]!=='tex'&&g[2]!==f[2])});last.tags.push(t)}openFb=id}
+  last.t=Date.now();try{r.snap=snapOf(r)}catch(err){}bookPut(B);bookRender()},true);
+function profRender(B){const L=learnProfile(B);const box=$('bprof');if(!L.n){box.innerHTML='';return}const T=profileText(L);
+  const tx={嫩:'肉要嫩',烂:'肉要软烂',脆:'菜要脆',软:'菜要软'};
+  box.innerHTML=`<div class="prof"><b>我的口味画像</b><span class="note"> · 从 ${L.n} 道打过分的菜学来</span><div style="margin-top:6px">${T.lines.length?T.lines.map(x=>`<span class="tg${x.strong?' s':''}">${esc(x.w)}${x.strong?'很多':'一点'}</span>`).join(''):'<span class="note">口味和标准做法差不多，再多打几道就更准了</span>'}${[T.meat,T.veg].filter(Boolean).map(v=>`<span class="tg">${tx[v]}</span>`).join('')}</div>
+   ${T.likes.length?`<div class="note" style="margin-top:4px">爱吃：${esc(T.likes.join('、'))}${T.foods.length?' · 爱吃的食材：'+esc(T.foods.join('、')):''}</div>`:''}${T.dislikes.length?`<div class="note">不太爱：${esc(T.dislikes.join('、'))}</div>`:''}
+   <div class="fl" style="margin-top:8px"><button class="btn sm pri" id="plearn">按我的口味设计新菜</button></div></div>`;
+  $('plearn').onclick=()=>{if(window.useLearn)window.useLearn();location.hash='ai'}}
+window.bookAll=book;
 $('blist').onclick=e=>{const b=e.target.closest('button[data-a]');if(!b)return;const id=b.closest('.bcard').dataset.id;const B=book();const r=B.find(x=>x.id===id);if(!r)return;
   if(b.dataset.a==='open'){window.openInEditor({dish:r.base||'',steps:JSON.parse(JSON.stringify(r.steps)),fin:r.fin,eat:r.eat,custom:r.name});location.hash='remix'}
   if(b.dataset.a==='card')openCard(r.name,r.steps,r.fin,r.eat,r.note||'');
+  if(b.dataset.a==='fix'){const rr=rateOf(r);const P=Object.assign(rateToPrefs(rr));b.disabled=true;b.textContent='改良中…';
+    setTimeout(()=>{try{const x=improve(r.steps,r.fin,r.eat,P,2500);const log=x.log.slice(0,5).map(l=>l[1]).join('；');openCard(r.name.replace(/（改良版）$/,'')+'（改良版）',x.steps,r.fin,r.eat,`按你的打分（${rr.s} 星${rr.tags&&rr.tags.length?'，'+rr.tags.join('、'):''}）改良：${log||'原配方已经很接近，只做了微调'}`)}catch(err){console.error(err)}b.disabled=false;b.textContent='按打分改良'},30)}
   if(b.dataset.a==='del'){if(b.dataset.sure){bookPut(B.filter(x=>x.id!==id));bookRender()}else{b.dataset.sure=1;b.textContent='再点一次删除'}}};
 $('bcopy').onclick=async()=>{const t=JSON.stringify(book());try{await navigator.clipboard.writeText(t);$('bmsg').textContent='已复制全部菜谱'}catch(e){$('bimp').value=t;$('bmsg').textContent='复制被拦截，已放进文本框'}};
-$('bdoimp').onclick=()=>{try{const L=JSON.parse($('bimp').value);if(!Array.isArray(L))throw 0;const ok=L.filter(b=>b&&b.name&&Array.isArray(b.steps)&&b.steps.every(s=>s.t!=='add'||IT[s.id]||FD[s.id])).map(b=>({id:'b'+Math.random().toString(36).slice(2,8),t:+b.t||Date.now(),name:String(b.name).slice(0,60),steps:b.steps,fin:['pot','A','B','C'].includes(b.fin)?b.fin:'pot',eat:b.eat==='drain'?'drain':'all',base:b.base||'',note:String(b.note||'').slice(0,200)}));bookPut(ok.concat(book()));bookRender();$('bmsg').textContent=`导入 ${ok.length} 个`}catch(e){$('bmsg').textContent='无法识别'}};
+$('bdoimp').onclick=()=>{try{const L=JSON.parse($('bimp').value);if(!Array.isArray(L))throw 0;const ok=L.filter(b=>b&&b.name&&Array.isArray(b.steps)&&b.steps.every(s=>s.t!=='add'||IT[s.id]||FD[s.id])).map(b=>({id:'b'+Math.random().toString(36).slice(2,8),t:+b.t||Date.now(),name:String(b.name).slice(0,60),steps:b.steps,fin:['pot','A','B','C'].includes(b.fin)?b.fin:'pot',eat:b.eat==='drain'?'drain':'all',base:b.base||'',note:String(b.note||'').slice(0,200),style:STYLES[b.style]?b.style:'',method:METHODS_D.includes(b.method)?b.method:'',rates:Array.isArray(b.rates)?b.rates.filter(x=>x&&x.s>=1&&x.s<=5).map(x=>({s:Math.round(x.s),t:+x.t||Date.now(),tags:(Array.isArray(x.tags)?x.tags:[]).filter(t=>FB.some(f=>f[0]===t))})).slice(-20):undefined}));bookPut(ok.concat(book()));bookRender();$('bmsg').textContent=`导入 ${ok.length} 个`}catch(e){$('bmsg').textContent='无法识别'}};
 window.bookShow=bookRender;
 try{render()}catch(e){}
 }
