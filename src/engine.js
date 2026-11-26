@@ -88,6 +88,9 @@ S('cy','菜籽油','油',{oil:1,raw:{off:.012,bitter:.006},rawT:125,rawK:.05,aro
 S('hsy','花生油','油',{oil:1,tas:{rich:.03},aroO:{wok:.02},rOil:.01,win:[150,250],def:30});
 S('zy','猪油','油',{oil:1,tas:{rich:.12},aroO:{wok:.05},rOil:.02,win:[100,220],def:20});
 S('xyou','香油','油',{oil:1,raw:{roast:.3,rich:.02},rawT:90,rawK:.012,def:3,note:'受热香气散，出锅淋'});
+S('sfen','蒜粉','辛香',{raw:{pungent:.6},rawK:.01,aroO:{wok:.5,sweet:.03},aroW:{sweet:.05,umami:.03},rOil:.05,win:[100,145],rWater:.004,rCold:.002,burnT:155,bRate:.08,bBit:.5,bBurnt:.5,def:2,al:['大蒜粉','蒜粉'],note:'1g 约等于 3g 鲜蒜，适合腌料'});
+S('ycf','洋葱粉','辛香',{raw:{pungent:.2},aroO:{wok:.35,sweet:.3,roast:.15},aroW:{sweet:.3,umami:.05},rOil:.04,win:[100,150],rWater:.004,rCold:.002,burnT:160,bRate:.06,def:2,note:'1g 约等于 8g 鲜洋葱'});
+S('aol','奥尔良腌料','香料',{tas:{salt:.35,sweet:.3,spicy:.08,umami:.1},raw:{spice:.3},aroO:{spice:.5,roast:.3,sweet:.1},rOil:.04,win:[100,150],rWater:.004,rCold:.002,burnT:160,bRate:.06,def:20,note:'咸甜微辣，自带盐和糖'});
 S('dian','淀粉','其他',{starch:1,def:5,note:'上浆护嫩；水淀粉勾芡挂汁'});
 S('jdq','蛋清','其他',{liq:.5,wat:.88,starch:.4,tas:{umami:.01},def:15});
 S('xs','小苏打','其他',{tas:{bitter:.1},soda:1,def:1,note:'嫩肉，多了发涩'});
@@ -277,17 +280,18 @@ V('gxyc','西洋菜','bcai',{al:['豆瓣菜']});V('gmec','木耳菜','bcai',{al:
 V('gmlh','马兰头','bcai',{fresh:.015,al:['马兰']});V('gdj','豆角丝','dou',{al:['豆角']});
 V('gyg','腰果','huot',{cat:'其他',salt:0,fat:.45,umami:.004,cook:.5,cut:'整',al:['核桃','杏仁','坚果']});
 
-const CUTS={'末':.25,'丝':.35,'液':.4,'片':.5,'条':.7,'丁':.8,'段':.8,'块':1.6,'整':2.4,'大块':2.8,'整条':3.5};
+const CUTS={'末':.25,'丝':.35,'液':.4,'片':.5,'条':.7,'丁':.8,'厚片':.9,'段':.8,'块':1.6,'整':2.4,'大块':2.8,'整条':3.5};
 const FCATS=['肉','禽','水产','蛋','豆制品','蔬菜','菌菇','主食','其他'];
 
 function clamp(x,a,b){return x<a?a:x>b?b:x}
 function mkC(id,name){return{id,name,items:[],foods:[],T:22,water:0,oil:0,lid:0,isPot:id==='pot',hot:0,maxT:22}}
+const MEATC=['肉','禽','水产'];
 function heatCap(c){let C=c.isPot?400:150;C+=c.water*4.18+c.oil*2;for(const f of c.foods)C+=(f.g-f.wl+f.oa)*3.4;for(const e of c.items){const d=IT[e.id];if(!d.oil&&!d.water)C+=e.g*2.5}return C}
 function foodMass(c){let m=0;for(const f of c.foods)m+=Math.max(0,f.g-f.wl+f.oa);return m}
 
 function addTo(c,id,g,cut,prep){
   const C0=heatCap(c);let tin;
-  if(FD[id]){const d=FD[id];cut=cut||d.cut;const f={id,g,cut,sf:CUTS[cut]||1,done:0,over:0,tender:0,brown:0,burnt:0,wl:0,fr:0,off:1,abs:0,oa:0,coated:0};
+  if(FD[id]){const d=FD[id];cut=cut||d.cut;const f={id,g,cut,sf:CUTS[cut]||1,done:0,over:0,tender:0,brown:0,burnt:0,wl:0,wa:0,fr:0,off:1,abs:0,oa:0,coated:0};
     if(prep==='blanch'){f.off=.45;f.done=.25;f.tender=d.coll?.08:0;f.wl=g*.05}
     if(prep==='preboil'){f.off=.35;f.done=1;f.over=.3;f.tender=d.coll?.5:0;f.wl=g*.12;f.abs=.05}
     c.foods.push(f);tin=prep?40:d.tin}
@@ -310,6 +314,7 @@ function sizzle(src,dst){ // 泼油：热油浇在料上瞬间激香
 function moveAll(src,dst,what){
   sizzle(src,dst);
   const C0=heatCap(dst),Cs=heatCap(src),T0=dst.T,Ts=src.T;
+  dst.bound=0;src.bound=0;
   if(what==='foods'){const mf=foodMass(src),tot=mf+src.water+src.oil+1;const fr=Math.min(.9,mf/tot+.15);
     dst.foods.push(...src.foods);src.foods=[];
     for(const e of src.items){const n=Object.assign({},e);n.g=e.g*fr;n.alc=e.alc*fr;e.g*=1-fr;e.alc*=1-fr;dst.items.push(n)}
@@ -319,7 +324,7 @@ function moveAll(src,dst,what){
 }
 
 function tick(c,fire,mode,lid,dt){
-  const mf=foodMass(c);const C=heatCap(c);
+  const T0=c.T;const mf=foodMass(c);const C=heatCap(c);
   let wet=c.water>Math.max(4,.1*mf);const steam=fire>0&&mode==='steam';
   if(fire>0){
     if(steam){c.T+=(100-c.T)*dt/50;c.water+=.03*dt;wet=true}
@@ -332,20 +337,27 @@ function tick(c,fire,mode,lid,dt){
   }else{c.T+=(25-c.T)*(c.isPot?3:6)*dt/C}
   c.maxT=Math.max(c.maxT,c.T);
   const T=c.T;
+  // 腌制：没开火的碗里，肉慢慢吸水（盐、小苏打让它吸得更多），淀粉把水挂成浆裹在料上
+  if(fire===0&&!c.isPot&&c.water>0&&c.foods.length&&T0<45){const meatG=c.foods.reduce((a,f)=>a+(MEATC.includes(FD[f.id].cat)?f.g:0),0);
+    if(meatG>0){const soda=c.items.reduce((a,e)=>a+(IT[e.id].soda?e.g:0),0),salt=c.items.reduce((a,e)=>a+e.g*((IT[e.id].tas||{}).salt||0),0);
+      const capF=.05+Math.min(.16,soda/meatG*28)+Math.min(.04,salt/meatG*4);
+      for(const f of c.foods){if(!MEATC.includes(FD[f.id].cat))continue;const cap=f.g*capF;if(f.wa>=cap)continue;const x=Math.min(c.water*.95,(cap-f.wa)*dt/(2400*Math.max(.4,f.sf)));f.wa+=x;f.wl-=x;c.water-=x;if(soda>0)f.soda=Math.max(f.soda||0,Math.min(1,soda/meatG*200))}}
+    const st=c.items.reduce((a,e)=>a+(IT[e.id].starch?e.g*IT[e.id].starch:0),0);const mf0=foodMass(c);
+    if(st>0&&mf0>0){const want=Math.min(st*1.4,mf0*.25)-(c.bound||0);if(want>0){const x=Math.min(c.water,want*Math.min(1,dt/60));c.bound=(c.bound||0)+x;c.water-=x;for(const f of c.foods){const sh=x*Math.max(0,f.g-f.wl)/mf0;f.wl-=sh;f.wa+=sh*.0}}}}
   // 食材
   for(const f of c.foods){const d=FD[f.id];
     let r=T<55?0:T<100?Math.pow((T-55)/45,1.5):1+(T-100)/60;
     const dd=r/(60*d.cook*Math.pow(f.sf,1.3))*dt;
-    if(f.done<1){f.done+=dd;if(f.done>1){f.over+=f.done-1;f.done=1}}else f.over+=dd*(f.coated?.5:1);
+    if(f.done<1){f.done+=dd;if(f.done>1){f.over+=f.done-1;f.done=1}}else f.over+=dd*(f.coated?.5:1)*(1-.45*(f.soda||0));
     if(d.coll&&T>80)f.tender+=(wet?1:.4)*Math.min(1,(T-80)/15)*dt/(60*d.coll*Math.sqrt(f.sf));
     if(!wet&&T>125){const sug=c.items.some(e=>IT[e.id].sugar&&e.g>3)?1.3:1;f.brown+=(T-125)/60*.011*dt/Math.pow(f.sf,.3)*sug*(d.leaf?.6:1);
       if(f.brown>1.5&&T>140)f.burnt+=.004*(T-140)/40*dt}
-    if(T>65&&d.wr>0&&f.wl<f.g*d.wr){const x=f.g*d.wr*.0015*(T>100?1.6:1)*dt/Math.pow(f.sf,.7);f.wl+=x;c.water+=x}
+    {const so=f.soda||0;const lim=f.g*d.wr*(1-.5*so)-(f.wa||0)*(.4+.35*so);if(T>65&&d.wr>0&&f.wl<lim){const x=Math.min(lim-f.wl,f.g*d.wr*.0015*(T>100?1.6:1)*(1-.4*so)*dt/Math.pow(f.sf,.7));f.wl+=x;c.water+=x}}
     if(d.wr<0&&c.water>0&&T>60){const x=Math.min(c.water,f.g*.01*dt);if(f.wl>f.g*d.wr){f.wl-=x;c.water-=x}}
     if(d.fat>0&&T>95&&f.fr<f.g*d.fat*.55){const x=f.g*d.fat*.0008*dt*(wet?.6:1.5)/Math.sqrt(f.sf);f.fr+=x;c.oil+=x}
     if(d.oab&&T>100&&c.oil>2&&f.oa<f.g*d.oab){const x=Math.min(c.oil-1,f.g*d.oab*.02*dt);f.oa+=x;c.oil-=x}
     if(T>90)f.off*=Math.exp(-(steam?.0012:lid?.0001:(wet?.0006:.0015))*dt);
-    const liq=c.water>2;const k=(liq?(T>80?.0007:.00025):.00008)*dt/f.sf;f.abs+=k*(1-f.abs);
+    const liq=c.water>2||(fire===0&&!c.isPot&&((c.bound||0)>2||(f.wa||0)>1));const k=(liq?(T>80?.0007:.00025):.00008)*dt/f.sf;f.abs+=k*(1-f.abs);
     if(!f.coated&&f.done<.2&&c.items.some(e=>IT[e.id].starch&&e.g>=2))f.coated=1;
   }
   // 调料
@@ -373,9 +385,9 @@ function liveNew(){const cs={pot:mkC('pot','炒锅'),A:mkC('A','A 碗'),B:mkC('B
   return{cs,hist:[{t:0,T:22,w:0,o:0}],marks:[],potLog:[],t:0,steps:[],errs:[],cur:null}}
 function liveRec(L){const p=L.cs.pot;L.hist.push({t:L.t,T:p.T,w:p.water,o:p.oil})}
 function liveRun(L,sec,fire,mode,lid,record){const cs=L.cs;
-  for(let i=0;i<sec;i++){tick(cs.pot,fire,mode,lid,1);for(const k of['A','B','C'])tick(cs[k],0,'wok',0,1);L.t++;
-    L.potLog.push({fire,mode,lid,T:cs.pot.T,wet:cs.pot.water>Math.max(4,.1*foodMass(cs.pot)),oil:cs.pot.oil,food:cs.pot.foods.length,items:cs.pot.items.some(e=>!IT[e.id].oil)});
-    if(L.t%3===0)liveRec(L)}
+  for(let i=0;i<sec;){const dt=fire===0&&i>=120&&sec-i>=30?30:1;tick(cs.pot,fire,mode,lid,dt);for(const k of['A','B','C'])tick(cs[k],0,'wok',0,dt);
+    const pl={fire,mode,lid,T:cs.pot.T,wet:cs.pot.water>Math.max(4,.1*foodMass(cs.pot)),oil:cs.pot.oil,food:cs.pot.foods.length,items:cs.pot.items.some(e=>!IT[e.id].oil)};
+    for(let j=0;j<dt;j++){L.t++;L.potLog.push(pl);if(L.t%3===0)liveRec(L)}i+=dt}
   if(record&&sec>0){const t=fire>0?'heat':'rest';const c=L.cur;
     if(c&&c.t===t&&(t==='rest'||(c.f===fire&&(c.m||'wok')===mode))&&!!c.lid===!!lid)c.s+=sec;
     else{const s={t,s:sec};if(t==='heat'){s.f=fire;if(mode!=='wok')s.m=mode}if(lid)s.lid=1;L.marks.push({t:L.t-sec,i:L.steps.length});L.steps.push(s);L.cur=s}}}

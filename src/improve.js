@@ -35,7 +35,7 @@ function fixCooking(steps,fin,eat,max){max=max||10;let S=clone(steps);const log=
 function tidy(S){const out=[];for(const s0 of S){const s=Object.assign({},s0);delete s._mv;delete s._ran;delete s._carry;
     if(s.t==='add'){s.g=s.g>=20?Math.round(s.g):s.g>=5?Math.round(s.g*2)/2:Math.round(s.g*10)/10;if(!(s.g>0))continue}
     const p=out[out.length-1];
-    if(s.t==='heat'&&!s.u&&p&&p.t==='heat'&&!p.u&&+p.f===+s.f&&!!p.lid===!!s.lid&&(p.m||'wok')===(s.m||'wok')){p.s+=s.s;continue}
+    if(s.t==='heat'&&!s.u&&p&&p.t==='heat'&&!p.u&&+p.f===+s.f&&!!p.lid===!!s.lid&&(p.m||'wok')===(s.m||'wok')){p.s+=s.s;if(s.how&&!p.how)p.how=s.how;continue}
     if(s.t==='heat'&&!s.u&&s.s<4)continue;out.push(s)}return out}
 
 // ---------- 口味改良 ----------

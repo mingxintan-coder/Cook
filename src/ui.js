@@ -112,7 +112,7 @@ function compute(){
   const minutes=sim.t/60;
   $('facts').innerHTML=[
    ['成菜色泽',`<span class="sw" style="background:${ev.color.hex}"></span>${ev.color.name}`],
-   ['汤汁状态',ev.sauce],['总用时',fmtT(sim.t)],
+   ['汤汁状态',ev.sauce],['总用时',(()=>{let pr=0;const fh=st.steps.findIndex(x=>x.t==='heat');st.steps.forEach((x,i)=>{if(x.t==='rest'&&(fh<0||i<fh))pr+=+x.s||0});return pr>=1800?fmtT(sim.t-pr)+'＋提前腌'+(pr>=21600?'一夜':fmtT(pr)):fmtT(sim.t)})()],
    ['锅里最高温',Math.round(sim.cs.pot.maxT)+'°C'],['剩余水分 / 油',`${Math.round(ev.water)} g / ${Math.round(ev.oil)} g`],
    ['平均入味',Math.round(ev.absAvg*100)+'%']].map(f=>`<div><b>${f[0]}</b>${f[1]}</div>`).join('');
   let hints=[];if(cmp){for(const [k,d] of cmp.diffs){const f=FIX[k];hints.push(`<li><b>${DN[k]}${d>0?'偏重':'不足'} ${d>0?'+':''}${d.toFixed(1)}</b>：${d>0?(f?'减少'+f[1]:'减少相关调料'):(f&&f[0]?'加'+f[0]:'检查做法')}</li>`)}
