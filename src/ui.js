@@ -93,6 +93,13 @@ function level(k,v){if(k==='salt')return v<1?'无':v<2.5?'淡':v<4?'偏淡':v<6.
   if(NEG.some(n=>n[0]===k))return v<1?'无':v<2?'轻微':v<3.5?'可察觉':v<5?'明显':'严重';
   return v<.6?'无':v<2?'微':v<4?'轻':v<6?'中':v<8?'重':'极重'}
 
+let vmode='simple';try{vmode=localStorage.getItem('tw.vmode')||'simple'}catch(e){}
+function setV(v){vmode=v;document.body.classList.toggle('simple',v==='simple');$('vmode').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v));try{localStorage.setItem('tw.vmode',v)}catch(e){}if(last)compute()}
+$('vmode').onclick=e=>{const b=e.target.closest('button');if(b)setV(b.dataset.v)};
+function simpleView(){const box=$('simpleView');if(!st.steps.length){box.innerHTML='<p class="note">空锅。切到“详细编辑”下料，或去“AI 设计菜”让程序设计一道。</p>';return}
+  let card;try{card=recipeCard(st.steps)}catch(e){box.textContent='';return}
+  box.innerHTML=card.ing.map(g=>`<p style="margin:4px 0"><b>${g.t}</b>：${g.rows.map(x=>esc(x.name)+' '+x.g+'g'+(/估/.test(x.note)?'<span class="note">(估)</span>':'')+(x.m?`<span class="note">（${x.m}）</span>`:'')).join('，')}</p>`).join('')+`<h3>做法 <span class="note">约 ${fmtT(card.total)}</span></h3><ol class="csteps">${card.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol><button class="btn sm" id="toFull">改步骤、用量和火候 →</button>`;
+  $('toFull').onclick=()=>setV('full')}
 function compute(){
   let sim,ev;try{sim=simulate(st.steps);ev=evaluate(sim,st.fin,st.eat)}catch(err){console.error(err);return}
   const T=target();const W=warnings(sim,ev);const types=flavorTypes(ev.D,ev.flags);const meth=detectMethods(sim);
@@ -121,6 +128,7 @@ function compute(){
   // 提醒
   const good=[];if(!W.some(w=>w[0]>=1))good.push([-1,'火候和调味没有明显问题。']);
   $('warns').innerHTML=W.concat(good).sort((a,b)=>b[0]-a[0]).map(w=>`<li class="${w[0]<0?'ok':'l'+w[0]}">${esc(w[1])}</li>`).join('');
+  if(vmode==='simple')simpleView();
   aromaPanel($('raroma'),ev.c);if(window.impRender)window.impRender();
   paintTimes();
   try{localStorage.setItem('tw.last',JSON.stringify(st))}catch(e){}
@@ -170,6 +178,7 @@ window.openInEditor=(o)=>{push();st=o;sel=-1;full()};
 window.wsGet=()=>st;window.wsSet=(steps,label)=>{push();st.steps=steps;if(label)st.custom=label;sel=-1;full()};window.wsLoad=(id)=>loadDish(id);window.wsTarget=()=>target();
 window.remixRefresh=()=>{paintRadar();paintTemp();const b=$('raroma');if(b._draw)b._draw()};
 // 启动
+document.body.classList.toggle('simple',vmode==='simple');$('vmode').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===vmode));
 let init=null;try{init=JSON.parse(localStorage.getItem('tw.last')||'null')}catch(e){}
 if(init&&Array.isArray(init.steps)&&init.steps.every(s=>s.t!=='add'||IT[s.id]||FD[s.id])){st=init;full();if(String(init.dish).startsWith('m:'))loadLibrary().then(()=>full())}else loadDish(DISHES[0].id);
 renderMine();

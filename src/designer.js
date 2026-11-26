@@ -1,0 +1,122 @@
+// ===== AI 设计菜：模板 + 模拟器寻优 =====
+// 味型：参照经典菜的味道作目标；调料包按每 500g 食材
+const STYLES={
+ '咸鲜':{ref:null,D:{salt:5.4,umami:6,wok:3.5,sweet:1.5,fresh:2,ferment:2.5},kit:[['salt',3,'finish'],['ls',8,'sauce'],['hy',8,'sauce'],['cong',15,'aroma'],['jiang',6,'aroma'],['suan',8,'aroma'],['lj',8,'mar']],pre:'清炒'},
+ '鱼香':{ref:'yxrs',kit:[['pj',25,'paste'],['jiang',8,'aroma'],['suan',14,'aroma'],['cong',20,'finish'],['bt',15,'sauce'],['xc',16,'sauce'],['ls',10,'sauce'],['dian',3,'sauce'],['qs',30,'sauce'],['lj',5,'mar']],pre:'鱼香'},
+ '宫保':{ref:'gbjd',kit:[['gla',8,'chili'],['hj',2,'chili'],['cong',30,'aroma'],['jiang',6,'aroma'],['suan',10,'aroma'],['bt',14,'sauce'],['xc',15,'sauce'],['ls',10,'sauce'],['salt',.5,'sauce'],['dian',4,'sauce'],['qs',30,'sauce'],['hs',40,'finish'],['lj',5,'mar']],pre:'宫保'},
+ '麻辣':{ref:'mpdf',kit:[['db',22,'paste'],['ljm',4,'paste'],['ds',5,'paste'],['jiang',6,'aroma'],['suan',10,'aroma'],['ls',5,'sauce'],['bt',2,'sauce'],['hjm',2.5,'finish'],['cong',10,'finish']],pre:'麻辣'},
+ '家常':{ref:'hgr',kit:[['db',15,'paste'],['tmj',8,'paste'],['ds',4,'paste'],['bt',3,'sauce'],['ls',4,'sauce'],['suan',8,'aroma'],['sm',60,'finish']],pre:'家常'},
+ '红烧':{ref:'hsr',kit:[['bingt',22,'caramel'],['lj',18,'wine'],['ls',18,'liquid'],['lc',7,'liquid'],['jiang',10,'liquid'],['cong',18,'liquid'],['bj',4,'spice'],['gp',3,'spice'],['xy',.6,'spice']],pre:'红烧'},
+ '糖醋':{ref:'tcpg',kit:[['bt',35,'sauce'],['xc',28,'sauce'],['ls',14,'sauce'],['fqj',10,'sauce'],['dian',4,'sauce'],['qs',40,'sauce'],['jiang',6,'aroma'],['lj',10,'mar'],['zm',4,'finish']],pre:'糖醋'},
+ '酸辣':{ref:'slts',kit:[['gla',8,'chili'],['hj',1.5,'chili'],['bc',15,'vinegar'],['salt',3.5,'finish'],['suan',8,'aroma'],['cong',10,'finish'],['jj',1.5,'finish']],pre:'酸辣'},
+ '孜然':{ref:'zrrp',kit:[['zr',8,'paste'],['ljm',4,'paste'],['salt',3,'finish'],['yc',80,'veg'],['xcai',12,'finish'],['lj',8,'mar']],pre:'孜然'},
+ '葱爆':{ref:'cbyr',kit:[['cong',150,'veg'],['ls',10,'mar'],['lj',8,'mar'],['xc',4,'vinegar'],['salt',1,'finish'],['xyou',4,'finish'],['bhj',1,'mar']],pre:'葱爆'},
+ '蒜香':{ref:null,D:{salt:5.2,umami:5.5,wok:7,pungent:3,sweet:1.2,fresh:2,ferment:1.5,roast:1},kit:[['suan',35,'aroma'],['salt',3,'finish'],['hy',8,'sauce'],['ls',5,'sauce'],['cong',10,'finish']],pre:'蒜香'},
+ '五香卤':{ref:'lnr',kit:[['ls',30,'liquid'],['lc',10,'liquid'],['bingt',12,'liquid'],['salt',8,'liquid'],['huj',20,'liquid'],['bj',4,'spice'],['gp',3,'spice'],['xy',.8,'spice'],['cg',3,'spice'],['hj',2,'spice'],['xhx',2,'spice'],['jiang',12,'liquid'],['cong',20,'liquid']],pre:'五香卤'},
+};
+const METHODS_D=['自动','快炒','红烧','炖','蒸','干煸','凉拌'];
+const isMeat=id=>['肉','禽','水产'].includes(FD[id].cat);
+function autoMethod(foods,style){const main=foods[0];const d=FD[main.id];
+  if(style==='红烧')return'红烧';if(style==='五香卤')return'炖';
+  if(d.coll>=40&&(CUTS[main.cut||d.cut]||1)>=1)return style==='咸鲜'?'炖':'红烧';
+  if(d.fish&&(main.cut||d.cut).startsWith('整')&&style==='咸鲜')return'蒸';
+  if(d.bean)return'干煸';if(main.id==='hg')return'凉拌';return'快炒'}
+function styleTarget(style){const s=STYLES[style];if(s.ref){const T=dishTarget(DISHES.find(d=>d.id===s.ref));return Object.assign({},T.D)}const D={};for(const [k] of DIMS.concat(NEG))D[k]=0;return Object.assign(D,s.D)}
+// 按模板生成步骤
+function buildSteps(spec,amt,P){const S=[];const foods=spec.foods;const mf=foods.reduce((a,f)=>a+f.g,0);const k=mf/500;const kit=STYLES[spec.style].kit.filter(x=>!(spec.cons&&spec.cons.noAlcohol&&ALC_IDS.includes(x[0]))&&!(spec.cons&&spec.cons.noSpicy&&SPICY_IDS.includes(x[0]))&&!(spec.cons&&spec.cons.noMSG&&MSG_IDS.includes(x[0])));
+  const g=(id,base)=>Math.max(.3,Math.round(base*k*(amt[id]||1)*10)/10);
+  const ph=p=>kit.filter(x=>x[2]===p);const add=(c,x)=>S.push({t:'add',c,id:x[0],g:g(x[0],x[1])});
+  const meats=foods.filter(f=>isMeat(f.id)),vegs=foods.filter(f=>!isMeat(f.id));
+  const fadd=(c,f,prep)=>{const s={t:'add',c,id:f.id,g:f.g,cut:f.cut||FD[f.id].cut};if(prep)s.prep=prep;S.push(s)};
+  const oilId=spec.cons&&spec.cons.lowOil?'hsy':(spec.style==='麻辣'||spec.style==='家常'||spec.style==='宫保'?'cy':'hsy');
+  const oil=(base)=>S.push({t:'add',c:'pot',id:oilId,g:Math.round(base*Math.max(.6,Math.min(1.6,k))*(spec.cons&&spec.cons.lowOil?.6:1)*(amt._oil||1))});
+  const m=spec.method;const tm=amt._t||1;
+  if(m==='快炒'||m==='干煸'){
+    const lean=meats.filter(f=>FD[f.id].lean||FD[f.id].coll<40||(CUTS[f.cut||FD[f.id].cut]||1)<1);
+    if(m==='快炒'&&lean.length){for(const f of lean)fadd('A',f);S.push({t:'add',c:'A',id:'salt',g:Math.round(lean.reduce((a,f)=>a+f.g,0)*.003*10)/10});for(const x of ph('mar'))add('A',x);S.push({t:'add',c:'A',id:'dian',g:Math.round(lean.reduce((a,f)=>a+f.g,0)*.02)},{t:'rest',s:600})}
+    const bowl=ph('sauce').some(x=>x[0]==='dian');if(bowl){for(const x of ph('sauce'))add('B',x)}
+    oil(m==='干煸'?45:38);S.push({t:'heat',f:3,s:120,u:'temp',v:amt._T||(ph('chili').length?150:170)});
+    if(ph('chili').length){for(const x of ph('chili'))add('pot',x);S.push({t:'heat',f:1,s:Math.round(25*tm)})}
+    const others=meats.filter(f=>!lean.includes(f));
+    if(m==='干煸'){for(const f of foods.filter(f=>!lean.includes(f)||m==='干煸'))if(!S.some(s=>s.t==='add'&&s.id===f.id))fadd('pot',f,FD[f.id].coll>=40?'preboil':'');S.push({t:'heat',f:2,s:Math.round(240*tm*(foods.some(f=>FD[f.id].bean)?1.6:1))})}
+    else{if(lean.length){S.push({t:'pour',from:'A',to:'pot',what:'all'},{t:'heat',f:3,s:Math.round(60*tm)})}for(const f of others)fadd('pot',f,'preboil');if(others.length)S.push({t:'heat',f:2,s:Math.round(90*tm)})}
+    if(ph('paste').length){for(const x of ph('paste'))add('pot',x);S.push({t:'heat',f:1,s:Math.round(40*(amt._p||1))})}
+    if(ph('aroma').length){for(const x of ph('aroma'))add('pot',x);S.push({t:'heat',f:2,s:20})}
+    if(m==='快炒'){for(const x of ph('veg'))add('pot',x);for(const f of vegs)fadd('pot',f);const vc=Math.max(30,...vegs.map(f=>FD[f.id].cook*60*Math.pow(CUTS[f.cut||FD[f.id].cut]||1,1.3)));if(vegs.length||ph('veg').length)S.push({t:'heat',f:3,s:Math.round(vc*.9*(amt._v||1))})}
+    else for(const x of ph('veg'))add('pot',x);
+    if(bowl)S.push({t:'pour',from:'B',to:'pot',what:'all'});else for(const x of ph('sauce'))add('pot',x);
+    for(const x of ph('vinegar'))add('pot',x);
+    S.push({t:'heat',f:3,s:20});for(const x of ph('finish'))add('pot',x);if(ph('finish').some(x=>!['xcai','hjm','cong','zm','hs','xyou'].includes(x[0])))S.push({t:'heat',f:3,s:8})}
+  else if(m==='红烧'||m==='炖'){
+    for(const f of meats)fadd('C',f,'blanch');
+    oil(m==='红烧'?12:20);
+    if(m==='红烧'&&ph('caramel').length){for(const x of ph('caramel'))add('pot',x);S.push({t:'heat',f:1,s:210})}
+    else S.push({t:'heat',f:2,s:40});
+    if(meats.length)S.push({t:'pour',from:'C',to:'pot',what:'all'},{t:'heat',f:2,s:90});
+    for(const x of ph('wine'))add('pot',x);if(ph('wine').length)S.push({t:'heat',f:3,s:20});
+    for(const x of ph('paste'))add('pot',x);if(ph('paste').length)S.push({t:'heat',f:1,s:40});
+    for(const x of ph('liquid').concat(ph('aroma')))add('pot',x);for(const x of ph('spice'))add('pot',x);
+    S.push({t:'add',c:'pot',id:'rs',g:Math.round(mf*(m==='炖'?2.2:.9)*(amt._w||1))},{t:'heat',f:3,s:900,u:'boil'});
+    const coll=Math.max(0,...foods.map(f=>FD[f.id].coll||0));const bt=Math.round((coll?coll*Math.sqrt(CUTS[foods[0].cut||FD[foods[0].id].cut]||1)*60*1.05:900)*tm);
+    const btt=Math.min(7200,bt);const rm=ph('spice').filter(x=>['xy','gp'].includes(x[0]));
+    if(rm.length&&btt>2700){S.push({t:'heat',f:1,s:2700,lid:1});for(const x of rm)S.push({t:'remove',c:'pot',id:x[0]});S.push({t:'heat',f:1,s:btt-2700,lid:1})}
+    else{S.push({t:'heat',f:1,s:btt,lid:1});if(ph('spice').some(x=>x[0]==='xy'))S.push({t:'remove',c:'pot',id:'xy'})}
+    for(const f of vegs){fadd('pot',f);S.push({t:'heat',f:1,s:Math.round(FD[f.id].cook*60*1.5),lid:1})}
+    for(const x of ph('sauce'))add('pot',x);
+    if(m==='红烧')S.push({t:'heat',f:3,s:900,u:'reduce'});else{S.push({t:'heat',f:2,s:120})}
+    for(const x of ph('finish'))add('pot',x)}
+  else if(m==='蒸'){for(const f of foods)fadd('pot',f);S.push({t:'add',c:'pot',id:'jiang',g:Math.round(10*k)});if(!(spec.cons&&spec.cons.noAlcohol))S.push({t:'add',c:'pot',id:'lj',g:Math.round(10*k)});S.push({t:'rest',s:300});
+    const ct=Math.max(...foods.map(f=>FD[f.id].cook*60*Math.pow(CUTS[f.cut||FD[f.id].cut]||1,1.3)));S.push({t:'heat',f:3,s:Math.round(ct*1.1*tm),m:'steam'},{t:'drain',c:'pot',kind:'water',keep:0},{t:'pour',from:'pot',to:'C',what:'all'});
+    const sk=kit.filter(x=>!['mar','aroma','paste','chili'].includes(x[2]));if(spec.style==='咸鲜'){S.push({t:'add',c:'C',id:'zyc',g:g('zyc',22)});for(const x of sk.filter(x=>!['salt','ls','hy'].includes(x[0])))add('C',x)}else for(const x of sk)add('C',x);S.push({t:'add',c:'C',id:'cong',g:Math.round(15*k)});S.push({t:'add',c:'pot',id:oilId,g:Math.round(25*Math.min(1.4,k))});S.push({t:'heat',f:3,s:60},{t:'pour',from:'pot',to:'C',what:'all'})}
+  else if(m==='凉拌'){for(const f of foods)fadd('pot',f,FD[f.id].mustCook||isMeat(f.id)?(isMeat(f.id)?'preboil':'blanch'):'');S.push({t:'pour',from:'pot',to:'B',what:'all'});
+    for(const x of kit.filter(x=>x[2]!=='mar'))add('B',x);
+    if(kit.some(x=>['chili','paste'].includes(x[2]))){oil(25);S.push({t:'heat',f:3,s:90,u:'temp',v:190},{t:'pour',from:'pot',to:'B',what:'all'})}else S.push({t:'add',c:'B',id:'xyou',g:Math.round(5*k)});
+    S.push({t:'rest',s:300})}
+  return S}
+function designScore(r,T,spec){const D=r.ev.D;let L=0;const W={salt:2,sweet:1.4,sour:1.4,spicy:1.4,numb:1.4,wok:.8,ferment:.9,spice:.9,fresh:.5,roast:.6,pungent:.5};
+  for(const k in W){const d=(D[k]||0)-(T[k]||0);L+=W[k]*d*d}
+  L+=3*Math.max(0,D.burnt-1)+2*Math.max(0,D.off-1.5)+2*Math.max(0,D.booze-1)+1.5*Math.max(0,D.bitter-2.5);
+  if(D.salt<3.5)L+=4*(3.5-D.salt);if(D.salt>6.8)L+=4*(D.salt-6.8);
+  const ft=flavorTypes(D,r.ev.flags).map(x=>x[0]);const want={'鱼香':'鱼香味','宫保':'煳辣荔枝味','麻辣':'麻辣味','家常':'家常味','红烧':'咸甜味(红烧)','糖醋':'糖醋味','酸辣':'酸辣味','孜然':'孜然味','五香卤':'五香/卤香味'}[spec.style];
+  if(want&&!ft.slice(0,2).includes(want))L+=3;
+  L+=sev(r.W)*6+r.W.filter(w=>w[0]===1).length*.6+texPen(r.ev,{meat:spec.meat,veg:spec.veg})*1.5;
+  for(const t of r.ev.tex){if(t.lab==='柴老'||t.lab==='老散')L+=3;if(t.lab.startsWith('硬韧'))L+=4;if(t.lab==='偏韧')L+=2.5;
+    const rawOk=spec.method==='凉拌'&&['hg','fq','qjz'].includes(t.id);if(!rawOk&&t.done<.97)L+=3*(1-t.done)*4}
+  return L}
+function design(spec,budgetMs){const t0=Date.now();budgetMs=budgetMs||3500;spec=Object.assign({},spec);
+  if(!spec.method||spec.method==='自动')spec.method=autoMethod(spec.foods,spec.style);
+  const T=designTarget(spec);
+  const fin=spec.method==='蒸'?'C':spec.method==='凉拌'?'B':'pot';const eat=spec.style==='五香卤'?'drain':'all';
+  let amt={};const ev=a=>{let S=buildSteps(spec,a);const r=runEval(S,fin,eat);return{S,r,L:designScore(r,T,spec)}};
+  return designSearch(spec,T,fin,eat,amt,ev,t0,budgetMs)}
+function designTarget(spec){const T=styleTarget(spec.style);if(spec.method==='凉拌'){if(spec.style==='蒜香'){T.pungent=5;T.wok=0;T.roast=1.5}T.wok=Math.min(T.wok,1);T.roast=Math.min(T.roast,2)}if(spec.method==='蒸')T.wok=Math.min(T.wok,1.5);if(spec.cons&&spec.cons.lowSalt)T.salt=Math.max(3.8,T.salt-1.2);if(spec.cons&&spec.cons.lowSugar)T.sweet=Math.max(0,T.sweet-2);if(spec.cons&&spec.cons.noSpicy){T.spicy=0}return T}
+function designSearch(spec,T,fin,eat,amt,ev,t0,budgetMs){
+  let best=ev(amt);let iter=0;const ids=[...new Set(STYLES[spec.style].kit.map(x=>x[0]).concat(['zyc']))];
+  const knobs=['_t','_v','_oil','_T','_p','_w'];
+  while(Date.now()-t0<budgetMs&&iter<30){iter++;let imp=null;
+    const D=best.r.ev.D;const errs=['salt','sweet','sour','spicy','numb','spice','wok','ferment','pungent','fresh','roast'].map(k=>[k,(D[k]||0)-(T[k]||0)]).filter(x=>Math.abs(x[1])>.4).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+    const cand=[];for(const [k,e] of errs.slice(0,3)){const contrib={};for(const [n,v] of best.r.ev.src[k]||[]){const id=NAME2ID[n.replace(/\(.*\)$/,'')];if(id&&ids.includes(id))contrib[id]=(contrib[id]||0)+v}
+      for(const id of Object.keys(contrib).sort((a,b)=>contrib[b]-contrib[a]).slice(0,2))for(const f of e<0?[1.3,1.7]:[.75,.5])cand.push(Object.assign({},amt,{[id]:Math.max(.2,Math.min(3,(amt[id]||1)*f))}))}
+    for(const kk of knobs)for(const f of [.75,1.3]){const v=(amt[kk]||(kk==='_T'?0:1));if(kk==='_T'){const base=amt._T||150;cand.push(Object.assign({},amt,{_T:Math.max(130,Math.min(200,base+(f>1?15:-15)))}))}else cand.push(Object.assign({},amt,{[kk]:Math.max(.4,Math.min(2.5,v*f))}))}
+    for(const a of cand){if(Date.now()-t0>budgetMs)break;const r=ev(a);if(r.L<(imp?imp.L:best.L*.99))imp=Object.assign(r,{a})}
+    if(!imp)break;best=imp;amt=imp.a}
+  const fx=fixCooking(best.S,fin,eat,8);const steps=fx.steps;const r=runEval(steps,fin,eat);const L=designScore(r,T,spec);
+  return{spec,steps,fin,eat,r,T,L,score:Math.max(0,Math.round(100-L*3)),name:dishName(spec),notes:designNotes(spec,steps,r),ms:Date.now()-t0}}
+function dishName(spec){const st=STYLES[spec.style];const fn=spec.foods.map(f=>FD[f.id].name.replace(/\(.*\)|（.*）/g,'').split('/')[0]);
+  let pre=st.pre;if(spec.style==='咸鲜')pre={'快炒':'清炒','红烧':'红烧','炖':'清炖','蒸':'清蒸','干煸':'干煸','凉拌':'凉拌'}[spec.method]||'清炒';
+  if(spec.method==='干煸'&&spec.style!=='咸鲜')pre='干煸';if(spec.method==='凉拌'&&spec.style!=='咸鲜')pre=pre+'拌';
+  return pre+fn.join('')}
+function designNotes(spec,steps,r){const N=[];const has=id=>steps.some(s=>s.t==='add'&&s.id===id);const cA=steps.some(s=>s.c==='A'&&s.t==='add'&&IT[s.id]&&IT[s.id].starch);
+  if(cA)N.push('瘦肉先用盐和淀粉上浆，下锅后表面凝固锁水，口感滑嫩。');
+  const tStep=steps.find(s=>s.u==='temp');if(tStep&&(has('gla')||has('hj')))N.push(`油烧到约 ${tStep.v}°C 就下干辣椒花椒，转小火炸出煳辣香，超过 170°C 容易发黑发苦。`);
+  if(steps.some(s=>s.prep==='blanch'))N.push('肉先焯水，去掉血沫和腥味。');
+  if(has('bingt')&&spec.method==='红烧')N.push('冰糖小火炒出糖色再下肉，颜色红亮且带焦糖香。');
+  const lid=steps.filter(s=>s.t==='heat'&&s.lid).reduce((a,s)=>a+s.s,0);if(lid>600)N.push(`加盖小火炖约 ${Math.round(lid/60)} 分钟，让胶原软化到软糯。`);
+  if(steps.some(s=>s.u==='reduce'))N.push('最后开盖大火收汁，汤汁变浓才挂得住。');
+  if(steps.some(s=>s.c==='B'&&s.t==='add'&&s.id==='dian'))N.push('碗汁里预先调好糖醋酱油和淀粉，出锅前一次倒入，几秒钟就能裹匀，不会把菜炒老。');
+  if(steps.some(s=>s.t==='remove'&&s.id==='xy'))N.push('香叶炖到一定时间就捞出，避免久煮发苦。');
+  if(has('db'))N.push('豆瓣酱小火慢炒，炒出红油和酱香再加别的料。');
+  if(spec.method==='蒸')N.push('蒸好倒掉腥味重的蒸汁，再淋豉油、泼热油激出葱香。');
+  const t=r.ev.tex.map(x=>x.name+x.lab).join('、');if(t)N.push(`成品口感：${t}。`);
+  return N}
+if(typeof module!=='undefined')module.exports={designTarget,designScore,design,STYLES,METHODS_D,buildSteps};

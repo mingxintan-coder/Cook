@@ -7,7 +7,8 @@ let P={delta:{},meat:'',veg:'',cons:{},missing:[]};let last=null;
 try{const s=JSON.parse(localStorage.getItem('tw.prefs')||'null');if(s&&s.delta)P=Object.assign(P,s,{missing:[]})}catch(e){}
 function save(){try{localStorage.setItem('tw.prefs',JSON.stringify(Object.assign({},P,{missing:[]})))}catch(e){}}
 function render(){
-  $('pdims').innerHTML=PD.map(([k,n])=>`<div class="prow"><span>${n}</span><span class="seg" data-k="${k}">${[-2,-1,0,1,2].map(v=>`<button data-v="${v}" aria-pressed="${(P.delta[k]||0)===v}" aria-label="${n}${['少很多','少一点','原样','多一点','多很多'][v+2]}">${['−−','−','原样','+','++'][v+2]}</button>`).join('')}</span></div>`).join('');
+  $('pdims').innerHTML=PD.map(([k,n],j)=>`<div class="prow${j>=6?' xd':''}"><span>${n}</span><span class="seg" data-k="${k}">${[-2,-1,0,1,2].map(v=>`<button data-v="${v}" aria-pressed="${(P.delta[k]||0)===v}" aria-label="${n}${['少很多','少一点','原样','多一点','多很多'][v+2]}">${['−−','−','原样','+','++'][v+2]}</button>`).join('')}</span></div>`).join('')+`<button class="btn sm" id="pmore">${document.body.classList.contains('showxd')?'收起':'更多口味：爆香、香料、清香、焦香、油润'}</button>`;
+  $('pmore').onclick=()=>{document.body.classList.toggle('showxd');render()};
   $('ptex').innerHTML=`<div class="prow"><span>肉</span><span class="seg" data-t="meat">${[['','原样'],['嫩','更嫩'],['烂','更软烂']].map(([v,n])=>`<button data-v="${v}" aria-pressed="${P.meat===v}">${n}</button>`).join('')}</span></div>
    <div class="prow"><span>蔬菜</span><span class="seg" data-t="veg">${[['','原样'],['脆','更脆'],['软','更软']].map(([v,n])=>`<button data-v="${v}" aria-pressed="${P.veg===v}">${n}</button>`).join('')}</span></div>`;
   $('pcons').innerHTML=CONS.map(([k,n])=>`<button class="chip" data-c="${k}" aria-pressed="${!!P.cons[k]}">${n}</button>`).join('');

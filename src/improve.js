@@ -17,7 +17,9 @@ function fixCooking(steps,fin,eat,max){max=max||10;let S=clone(steps);const log=
       if(best){const s=S[best.o.i];
         if(s.u==='temp'){s.v=Math.max(120,(+s.v||165)-25);log.push(['火候',`第 ${best.o.i+1} 步油温降到约 ${s.v}°C，避免${best.o.who||'食材'}焦糊`])}
         else if(+s.f>1){s.f=+s.f-1;log.push(['火候',`第 ${best.o.i+1} 步火力调为${['','小火','中火','大火'][s.f]}，避免${best.o.who||'食材'}焦糊`])}
-        else{const n=Math.max(10,Math.round(s.s*.6));log.push(['火候',`第 ${best.o.i+1} 步时间 ${s.s}秒 → ${n}秒，避免${best.o.who||'食材'}焦糊`]);s.s=n}
+        else{const id=NAME2ID[best.o.who];let ai=-1;for(let j=best.o.i-1;j>=0;j--){if(S[j].t==='add'&&S[j].id===id&&(!S[j].c||S[j].c==='pot')){ai=j;break}}
+          if(ai>=0&&IT[id]&&!IT[id].oil&&!s._mv){const [st]=S.splice(ai,1);S.splice(best.o.i,0,st);S[best.o.i-1]._mv=1;log.push(['顺序',`${best.o.who}改到这段小火之后再下，避免焦糊`])}
+          else{const n=Math.max(10,Math.round(s.s*.6));log.push(['火候',`第 ${best.o.i+1} 步时间 ${s.s}秒 → ${n}秒，避免${best.o.who||'食材'}焦糊`]);s.s=n}}
         changed=true}}
     // 2 没熟：延长食材下锅后的最后一次加热
     if(!changed){const raw=cur.ev.tex.filter(t=>t.must&&t.done<.97);if(raw.length){const t=raw[0];
@@ -28,7 +30,13 @@ function fixCooking(steps,fin,eat,max){max=max||10;let S=clone(steps);const log=
     // 3 腥膻：焯水
     if(!changed&&W.some(w=>/腥膻/.test(w[1]))){const f=S.find(s=>s.t==='add'&&FD[s.id]&&FD[s.id].off>=.005&&!s.prep);if(f){f.prep='blanch';log.push(['做法',`${FD[f.id].name}先焯水去腥`]);changed=true}}
     if(!changed)break;const nx=runEval(S,fin,eat);if(sev(nx.W)>sev(cur.W)+1)break;cur=nx}
-  return{steps:S,log,cur}}
+  S=tidy(S);cur=runEval(S,fin,eat);return{steps:S,log,cur}}
+// 合并连续同条件加热、去掉过短加热、整理用量
+function tidy(S){const out=[];for(const s0 of S){const s=Object.assign({},s0);delete s._mv;delete s._ran;delete s._carry;
+    if(s.t==='add'){s.g=s.g>=20?Math.round(s.g):s.g>=5?Math.round(s.g*2)/2:Math.round(s.g*10)/10;if(!(s.g>0))continue}
+    const p=out[out.length-1];
+    if(s.t==='heat'&&!s.u&&p&&p.t==='heat'&&!p.u&&+p.f===+s.f&&!!p.lid===!!s.lid&&(p.m||'wok')===(s.m||'wok')){p.s+=s.s;continue}
+    if(s.t==='heat'&&!s.u&&s.s<4)continue;out.push(s)}return out}
 
 // ---------- 口味改良 ----------
 const NAME2ID={};for(const id in IT)NAME2ID[IT[id].name]=id;for(const id in FD)NAME2ID[FD[id].name]=id;
@@ -119,5 +127,5 @@ function improve(steps0,fin,eat,prefs,budgetMs){
   const sum=st=>{const m={};for(const s of st)if(s.t==='add'&&IT[s.id])m[s.id]=(m[s.id]||0)+(+s.g);return m};const a=sum(steps0),b=sum(S);
   for(const id in a)if(!touched.has(id)&&b[id]!=null&&Math.abs(b[id]-a[id])>Math.max(.3,a[id]*.08))log.push(['用量',`${IT[id].name} ${+a[id].toFixed(1)}g → ${+b[id].toFixed(1)}g`]);
   const seen=new Set();const L=log.filter(x=>{const k=x.join('|');if(seen.has(k))return false;seen.add(k);return true});
-  return{steps:S,log:L,before:base,after:cur,target:T,ms:Date.now()-t0}}
-if(typeof module!=='undefined')module.exports={fixCooking,improve,trace,runEval};
+  S=tidy(S);cur=runEval(S,fin,eat);return{steps:S,log:L,before:base,after:cur,target:T,ms:Date.now()-t0}}
+if(typeof module!=='undefined')module.exports={fixCooking,improve,trace,runEval,tidy};

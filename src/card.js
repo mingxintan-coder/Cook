@@ -16,7 +16,7 @@ function recipeCard(steps,opts){opts=opts||{};const k=opts.scale||1;steps=JSON.p
   const seen={};
   steps.forEach((s,i)=>{if(s.t!=='add')return;const d=FD[s.id]||IT[s.id];if(!d)return;let g='调料';
     if(FD[s.id])g=s.c==='A'?'腌料（A 碗）':'主料';else if(s.c==='A')g='腌料（A 碗）';else if(s.c==='B')g='碗汁（B 碗）';else if(i>lastHeat)g='出锅时';
-    const key=g+'|'+s.id+'|'+(s.cut||'');if(seen[key]){seen[key][1]+=s.g*k;return}const row=[d.name,s.g*k,s.id,FD[s.id]?(s.cut||d.cut)+(s.prep==='blanch'?'，焯水':s.prep==='preboil'?'，煮熟':''):''];seen[key]=row;groups[g].push(row)});
+    const key=g+'|'+s.id+'|'+(s.cut||'');if(seen[key]){seen[key][1]+=s.g*k;return}const row=[d.name,s.g*k,s.id,(FD[s.id]?(s.cut||d.cut)+(s.prep==='blanch'?'，焯水':s.prep==='preboil'?'，煮熟':''):'')+(s.est?(FD[s.id]?'，':'')+'估':'')];seen[key]=row;groups[g].push(row)});
   const ing=Object.entries(groups).filter(([,r])=>r.length).map(([t,rows])=>({t,rows:rows.map(r=>({name:r[0],g:fmtG(r[1]),m:FD[r[2]]?'':measure(r[2],r[1]),note:r[3]}))}));
   // 步骤
   const out=[];let buf=[];let bufC='pot';
@@ -38,9 +38,13 @@ function recipeCard(steps,opts){opts=opts||{};const k=opts.scale||1;steps=JSON.p
         if(onlyOil&&!wet)h=`${f}把油烧热约 ${fmtT(dur)}（约 ${Math.round(t1)}°C，${oilCue(t1)||'温油'}）`;
         else{h=`${s.lid?'盖盖':''}${f}${wet?(dur>=600?'炖':'煮'):pl.food?(pl.oil>150?'炸':dur>=150?'煸炒':'翻炒'):'炒香'} ${fmtT(dur)}`;if(!wet&&t1>110)h+=`（锅温约 ${Math.round(t1)}°C）`}}
       if(buf.length&&bufC!=='pot')flush();flush(h)}
-    else if(s.t==='rest'){if(buf.length&&bufC!=='pot')flush();if(aPending){out.push(`A 碗的料抓匀，腌 ${fmtT(s.s)}。`);aPending=false}else out.push(`关火${s.lid?'盖盖':''}静置 ${fmtT(s.s)}。`)}
-    else if(s.t==='pour'){flush();const from=CNAME[s.from],to=CNAME[s.to||'pot'];out.push(s.what==='foods'?`把 ${from}里的食材盛到 ${to}，汤汁留着。`:s.from==='B'?`${from}的料汁搅匀，倒进${to}。`:s.from==='A'?`把 ${from}腌好的料下${to}。`:`把 ${from}里的东西倒进${to}。`)}
-    else if(s.t==='drain'){flush();out.push(s.kind==='water'?`倒掉多余汤汁，只留约 ${s.keep}g。`:`倒出多余的油，留底油约 ${s.keep}g。`)}
+    else if(s.t==='rest'){const lastC=bufC;if(buf.length&&bufC!=='pot')flush();const heated=steps.slice(0,i).some(x=>x.t==='heat');
+      if(aPending){out.push(`A 碗的料抓匀，腌 ${fmtT(s.s)}。`);aPending=false}
+      else if(lastC==='B'||lastC==='C'){out.push(`拌匀，静置 ${fmtT(s.s)} 入味。`)}
+      else if(!heated){if(buf.length)flush('抓匀，腌 '+fmtT(s.s));else out.push(`腌 ${fmtT(s.s)}。`)}
+      else out.push(`关火${s.lid?'盖盖':''}静置 ${fmtT(s.s)}。`)}
+    else if(s.t==='pour'){flush();const from=CNAME[s.from],to=CNAME[s.to||'pot'];out.push(s.what==='foods'?`把 ${from}里的食材盛到 ${to}，汤汁留着。`:s.from==='B'?`${from}的料汁搅匀，倒进${to}。`:s.from==='A'?`把 ${from}腌好的料下${to}。`:(s.from==='pot'&&!sim.cs.pot.foods.length&&i>0&&steps[i-1].t==='heat'?`把热油浇到${to}上。`:`把 ${from}里的东西倒进${to}。`))}
+    else if(s.t==='drain'){flush();out.push(s.kind==='water'?(+s.keep?`倒掉多余汤汁，只留约 ${s.keep}g。`:'倒掉蒸出来的汤汁。'):`倒出多余的油，留底油约 ${s.keep}g。`)}
     else if(s.t==='remove'){flush();out.push(`捞出${(IT[s.id]||{name:'料'}).name}。`)}});
   flush();
   return{ing,steps:out.filter(x=>x&&x!=='。'),total:sim.t}}

@@ -93,7 +93,7 @@ function convert(d){
   for(const i of items)i.g=Math.round(Math.min(i.food?3000:(IT[i.id]&&IT[i.id].water?4000:400),i.g)*10)/10;
   const cov=totW?mappedW/totW:0;
   // 步骤
-  const S=[];const add=(it,c,prep)=>{if(it.added)return;it.added=true;const s={t:'add',c,id:it.id,g:+(+it.g).toFixed(1)};if(it.food){s.cut=FD[it.id].cut;if(prep||it.prep)s.prep=prep||it.prep}S.push(s)};
+  const S=[];const add=(it,c,prep)=>{if(it.added)return;it.added=true;const s={t:'add',c,id:it.id,g:+(+it.g).toFixed(1)};if(it.est)s.est=1;if(it.food){s.cut=FD[it.id].cut;if(prep||it.prep)s.prep=prep||it.prep}S.push(s)};
   let oil=false,fire=3,lid=0;const where={};let anyHeat=false;let Bused=false,Aused=false,Cfoods=false,sauceStep=false,Apoured=false;
   const tok=it=>[it.nm,it.key].concat(GT[it.id]||[]);
   const RO={mar:['mar','main','batter'],sauce:['sauce','main','fin'],cook:['main','fin','batter','mar','sauce']};
@@ -114,7 +114,7 @@ function convert(d){
     const isBlanch=/焯|冷水下锅|汆烫|飞水/.test(st)&&!/(炒|煸|爆)/.test(st);
     const isSauce=(/碗汁|料汁|调汁|调成汁|调匀|兑|调好|调.{0,6}汁/.test(st))&&!/锅|炒|煮/.test(st);
     if(!cooking&&!isMar&&!isSauce){continue}
-    if(isBlanch){for(const it of mention(st))if(it.food)it.prep='blanch';continue}
+    if(isBlanch){const pb=/煮到|煮熟|煮至|扎透|断生后|煮\s*\d+\s*分钟/.test(st);for(const it of mention(st))if(it.food)it.prep=pb&&!FD[it.id].leaf?'preboil':'blanch';continue}
     if(isMar){const ms=mention(st,'mar');const mg=items.filter(i=>!i.added&&i.role==='mar'&&i.food);const L=[...new Set([...mg,...ms])];if(!L.length)continue;
       for(const it of L){add(it,'A');where[it.id]='A'}Aused=true;
       const dd=durations(st);let r=dd.length?dd[0]:(/一夜|过夜|隔夜|冷藏/.test(st)?3600:600);S.push({t:'rest',s:Math.min(3600,Math.round(r))});continue}
@@ -130,6 +130,7 @@ function convert(d){
       else if(/(放|倒|下|加|起|烧|热|凉|冷)油|油热|热锅|烧热|食用油|猪油|油温|锅里放油|锅中放油|冷油|凉油|油铺|底油|油烧/.test(c)||(/油/.test(c)&&/烧|热|冒烟/.test(c)))ensureOil(c,false);
       // 碗汁、回锅
       if((/汁.{0,8}(淋入|倒入|下入|烹入)/.test(c)&&!/汤汁|收汁/.test(c))||/(倒|淋|烹|下|加|入|搅匀).{0,4}(碗汁|料汁|糖醋汁|酱汁|调好的汁|芡汁|兑好的|宫保汁|鱼香汁|.{0,3}汁)/.test(c)&&!/汤汁|收汁/.test(c)){const rest=items.filter(i=>i.role==='sauce'&&!i.added);if(Bused)S.push({t:'pour',from:'B',to:'pot',what:'all'});for(const it of rest)add(it,'pot');Bused=false}
+      if(Cfoods&&items.some(i=>i.added&&i.food&&i.inC&&tok(i).some(t=>t&&t.length>=1&&c.includes(t)))&&/下|放|倒|回/.test(c)){S.push({t:'pour',from:'C',to:'pot',what:'all'});Cfoods=false;items.forEach(i=>i.inC=false)}
       if(Cfoods&&/回锅|倒回|回鸡蛋|放回|再下|下入炸好|下肉|倒入炸好|炸好的|铺在|码上|放上|煎好的|盛出的/.test(c)){S.push({t:'pour',from:'C',to:'pot',what:'all'});Cfoods=false}
       if(/倒出.*油|留底油|控油|沥油/.test(c)&&oil)S.push({t:'drain',c:'pot',kind:'oil',keep:20});
       // A 碗里的食材被提到，或者“下锅”且 A 里有食材 → 整碗倒入
@@ -160,12 +161,12 @@ function convert(d){
       else if(/翻匀|炒匀|拌匀|炒散|颠匀|翻炒均匀/.test(c))heat(30,3);
       else if(/金黄|变色|定型|翻面|上色/.test(c)&&oil)heat(90,2);
       else if(/炒/.test(c))heat(60,3);else if(/红烧|小火烧|烧入味|焖烧/.test(c))heat(600,1,{lid:1});
-      if(/盛出|捞出|出锅备用|盛起|拨到一边/.test(c)&&st!==d.steps[d.steps.length-1]&&S.some(s=>s.t==='add'&&s.c==='pot'&&FD[s.id])){S.push({t:'pour',from:'pot',to:'C',what:'foods'});Cfoods=true}
+      if(/盛出|捞出|出锅备用|盛起/.test(c)&&st!==d.steps[d.steps.length-1]&&S.some(s=>s.t==='add'&&s.c==='pot'&&FD[s.id])){S.push({t:'pour',from:'pot',to:'C',what:'foods'});Cfoods=true;items.forEach(i=>{if(i.added&&i.food)i.inC=true})}
     }
   }
   // 没被提到的料：腌料进 A，碗汁进 B，其余放进第一次下食材之后
   const rest=items.filter(i=>!i.added&&!i.isWater);
-  const mkS=it=>{it.added=true;const s={t:'add',c:'pot',id:it.id,g:+(+it.g).toFixed(1)};if(it.food){s.cut=FD[it.id].cut;if(it.prep)s.prep=it.prep}return s};
+  const mkS=it=>{it.added=true;const s={t:'add',c:'pot',id:it.id,g:+(+it.g).toFixed(1)};if(it.est)s.est=1;if(it.food){s.cut=FD[it.id].cut;if(it.prep)s.prep=it.prep}return s};
   const potIdx=f=>S.findIndex(f);
   // 食材：放在第一次下食材后；没有则放在第一段加热前（油之后）
   for(const it of rest.filter(i=>i.food)){let i=potIdx(s=>s.t==='add'&&s.c==='pot'&&FD[s.id]);if(i<0){i=potIdx(s=>s.t==='heat'&&(s.s>=60||s.u));if(i<0)i=S.length;S.splice(i,0,mkS(it))}else S.splice(i+1,0,mkS(it))}
@@ -184,9 +185,14 @@ function convert(d){
 
 const out=[];let nOk=0;const t0=Date.now();const errs=[];const times=[];
 for(const d of D){let r;try{r=convert(d)}catch(e){errs.push([d.name,String(e)]);continue}
-  if(r.ok){const t1=Date.now();try{const fx=I.fixCooking(r.steps,r.fin,r.eat,25);r.steps=fx.steps;r.fixlog=fx.log;const sim=E.simulate(r.steps);const ev=E.evaluate(sim,r.fin,r.eat);if(!isFinite(ev.D.salt))throw 'nan';r.t=sim.t;r.salt=ev.D.salt}catch(e){errs.push([d.name,'sim '+e]);r.ok=false}times.push(Date.now()-t1)}
-  if(r.ok)nOk++;
-  out.push({id:d.id,name:d.name,chef:d.chef||'村驴',main:d.main,base:d.base,unit:d.unit,tag:d.tag,groups:d.groups,steps:d.steps,tips:d.tips,src:d.src,sim:r.ok?{steps:r.steps,fin:r.fin,eat:r.eat,fix:(r.fixlog||[]).length}:null,cov:r.cov,unm:r.unm,why:r.ok?'':(r.bakery?'面点/烘焙/西点':r.cov<60?'用料识别率低':'步骤无法转换')})}
-console.error('ok',nOk,'/',D.length,'errors',errs.length,errs.slice(0,5),'simtime max',Math.max(...times),'avg',(times.reduce((a,b)=>a+b,0)/times.length).toFixed(1));
+  if(r.ok){const t1=Date.now();try{let fx=I.fixCooking(r.steps,r.fin,r.eat,40);r.steps=fx.steps;r.fixlog=fx.log;
+    // 估计用量的咸味料按咸度校准
+    for(let k=0;k<4;k++){const ev0=E.evaluate(E.simulate(r.steps),r.fin,r.eat);const sd=ev0.D.salt;if(sd>=3.5&&sd<=6.8)break;
+      const est=r.steps.filter(s=>s.t==='add'&&s.est&&IT[s.id]&&(IT[s.id].tas.salt||0)>=.05);if(!est.length)break;const f=Math.max(.3,Math.min(2.5,Math.pow(5.4/Math.max(.5,sd),1.6)));for(const s of est)s.g=Math.round(s.g*f*10)/10;r.salted=1}
+    if(r.salted){fx=I.fixCooking(r.steps,r.fin,r.eat,10);r.steps=fx.steps;r.fixlog.push(...fx.log)}
+    const sim=E.simulate(r.steps);const ev=E.evaluate(sim,r.fin,r.eat);if(!isFinite(ev.D.salt))throw 'nan';r.t=sim.t;r.salt=ev.D.salt}catch(e){errs.push([d.name,'sim '+e]);r.ok=false}times.push(Date.now()-t1)}
+  if(r.ok){const ev=E.evaluate(E.simulate(r.steps),r.fin,r.eat);const W=E.warnings(E.simulate(r.steps),ev);const sv=W.filter(w=>w[0]>=2).length,mid=W.filter(w=>w[0]===1).length;r.feas=sv?'低':mid>2?'中':'高';nOk++}
+  out.push({id:d.id,name:d.name,chef:d.chef||'村驴',main:d.main,base:d.base,unit:d.unit,tag:d.tag,groups:d.groups,steps:d.steps,tips:d.tips,src:d.src,sim:r.ok?{steps:r.steps,fin:r.fin,eat:r.eat,fix:(r.fixlog||[]).length,feas:r.feas}:null,cov:r.cov,unm:r.unm,why:r.ok?'':(r.bakery?'面点/烘焙/西点':r.cov<60?'用料识别率低':'步骤无法转换')})}
+const fz={};for(const o of out)if(o.sim)fz[o.sim.feas]=(fz[o.sim.feas]||0)+1;console.error('feas',fz);console.error('ok',nOk,'/',D.length,'errors',errs.length,errs.slice(0,5),'simtime max',Math.max(...times),'avg',(times.reduce((a,b)=>a+b,0)/times.length).toFixed(1));
 fs.writeFileSync(process.argv[3]||'recipes.json',JSON.stringify(out));
 module.exports={convert};

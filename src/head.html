@@ -198,11 +198,24 @@ body:not([data-mode=remix]) .top{padding-bottom:6px}
 .bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
 .bcard{background:var(--bg);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px;border:1.5px solid var(--line)}
 .modal>.mh,.modal>.cats,.modal>p{flex:none}.pick{align-content:start;grid-auto-rows:min-content}
+
+body.simple .adv{display:none!important}body:not(.simple) .sonly{display:none!important}
+body.simple .facts div:nth-child(n+4){display:none}
+body.simple #raroma{display:none}
+#vmode button[aria-pressed=true]{background:var(--red2);color:#fff}
+#simpleView h3{margin:8px 0 4px}#simpleView .csteps{margin:6px 0}
+.afrow{display:grid;grid-template-columns:minmax(0,1fr) 84px 14px 70px 36px;gap:6px;align-items:center;background:var(--bg);border-radius:10px;padding:6px 8px;margin:6px 0}
+.afrow input,.afrow select{border:1px solid var(--line);border-radius:8px;padding:6px;min-height:38px;background:var(--card);font-size:16px;width:100%}
+.afrow input{text-align:right}
+#amethod{display:inline-flex;flex-wrap:wrap}#amethod button[aria-pressed=true]{background:var(--red2);color:#fff}
+#moreData>summary{font-weight:700;min-height:44px}
+.feas{font-size:12px;border-radius:5px;padding:0 5px;margin-left:4px}.feas.f高{background:var(--ok);color:#fff}.feas.f中{background:var(--warn);color:#fff}.feas.f低{background:var(--bad);color:#fff}
+body:not(.showxd) .prow.xd{display:none}
 </style></head><body>
 <header class="top">
  <h1>锅气 · 中餐调味模拟器</h1>
  <p id="sub">选一道经典菜作底，改调料的种类、用量、下锅顺序和火候，看锅温、出水、焦化怎样一步步改变最终味道。</p>
- <nav class="modes" aria-label="模式"><a href="#remix">菜谱工坊</a><a href="#stove">从零下厨</a><a href="#spice">调香料</a><a href="#book">我的菜谱</a></nav>
+ <nav class="modes" aria-label="模式"><a href="#remix">菜谱工坊</a><a href="#stove">从零下厨</a><a href="#spice">调香料</a><a href="#ai">AI 设计菜</a><a href="#book">我的菜谱</a></nav>
  <nav class="dishes" id="dishes" aria-label="经典菜"></nav>
 </header>
 <main class="wrap view" id="v-remix">
@@ -217,18 +230,20 @@ body:not([data-mode=remix]) .top{padding-bottom:6px}
   <section aria-label="步骤">
    <h2 id="dname">步骤</h2>
    <p class="desc" id="ddesc"></p>
-   <div class="fl" style="margin-bottom:6px">
+   <div class="fl" style="margin-bottom:8px"><span class="seg" id="vmode"><button data-v="simple">简洁</button><button data-v="full">详细编辑</button></span></div>
+   <div id="simpleView" class="card sonly"></div>
+   <div class="fl adv" style="margin-bottom:6px">
     <label>成品在 <select id="fin"><option value="pot">锅</option><option value="A">A 碗</option><option value="B">B 碗</option><option value="C">C 盘</option></select></label>
     <label>吃法 <select id="eat"><option value="all">连汁一起吃</option><option value="drain">只吃料（汤汁不喝）</option></select></label>
    </div>
-   <div class="bar">
+   <div class="bar adv">
     <button class="btn pri" data-new="add">＋ 下料</button><button class="btn" data-new="heat">＋ 加热</button><button class="btn" data-new="rest">＋ 静置/腌</button><button class="btn" data-new="pour">＋ 倒入/盛出</button><button class="btn" data-new="drain">＋ 沥油/沥汁</button><button class="btn" data-new="remove">＋ 捞出</button>
     <button class="btn" id="wcard">菜谱卡</button><button class="btn" id="undo" title="撤销">↶ 撤销</button><button class="btn" id="reset">还原标准做法</button><button class="btn" id="clear">空锅</button>
    </div>
-   <p class="note" id="insHint"></p>
+   <p class="note adv" id="insHint"></p>
    <details id="orig" class="card" hidden style="margin:0 0 10px"><summary id="origsum">原文配方</summary><div id="origbody" style="font-size:15px"></div></details>
-   <ol class="steps" id="steps"></ol>
-   <div class="mine"><input id="saveName" placeholder="给你的版本起个名" style="border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--card);font-size:16px"><button class="btn" id="save">保存到本机</button><span id="mineList" class="tags"></span></div>
+   <ol class="steps adv" id="steps"></ol>
+   <div class="mine adv"><input id="saveName" placeholder="给你的版本起个名" style="border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--card);font-size:16px"><button class="btn" id="save">保存到本机</button><span id="mineList" class="tags"></span></div>
   </section>
  </div>
  <section class="card" id="improve" style="margin-top:22px"><h2>按口味改良</h2><p class="note" style="margin:0 0 8px">说出你想要的口味，程序会改用量、换料、调顺序和火候，逐条告诉你改了什么。改完先预览，满意再采用。</p>
@@ -239,6 +254,7 @@ body:not([data-mode=remix]) .top{padding-bottom:6px}
    <div><div class="tags" id="pcmp"></div><p class="note" id="ptexr"></p><h3>改了什么</h3><ul class="hint" id="plog"></ul><p class="note" id="pwarn"></p>
     <div class="fl"><button class="btn pri" id="papply">采用改良版</button><button class="btn" id="pcard">看菜谱卡</button><button class="btn" id="psave">存进我的菜谱</button></div></div></div></div>
  </section>
+ <details class="adv2" id="moreData"><summary>细节与数据：锅温曲线、味道拆解、口感表</summary>
  <div class="lower">
   <section class="card"><h2>锅温与汤汁</h2><div class="tfig" id="tchart"><svg role="img" aria-label="锅温随时间变化"></svg><div class="tip" id="tip"></div></div>
    <div class="legend"><span><i style="background:var(--red2)"></i>锅温 °C</span><span><i style="background:var(--soy);opacity:.5;height:8px"></i>锅中水分 g</span><span>竖线 = 第几步</span></div>
@@ -246,6 +262,7 @@ body:not([data-mode=remix]) .top{padding-bottom:6px}
   </section>
   <section class="card"><h2>味道拆解</h2><p class="note" style="margin:0 0 6px">点某一味看它从哪里来。竖线是标准做法的值。</p><div class="rows" id="dims"></div></section>
  </div>
+ </details>
  <section class="card" style="margin-top:22px"><h2>师傅提醒</h2><ul class="warns" id="warns"></ul></section>
  <section class="card" id="raroma" hidden style="margin-top:22px"></section>
  <details><summary>模拟怎么算的</summary><div class="note" style="max-width:75ch">
@@ -307,6 +324,28 @@ body:not([data-mode=remix]) .top{padding-bottom:6px}
   <section class="card"><h2>配料提醒</h2><ul class="warns" id="xwarn"></ul>
    <h3>放进调料架</h3><p class="note" style="margin:0 0 6px">把这包料变成一种调料，在“改经典菜”和“从零下厨”里使用。</p>
    <div class="fl"><input id="xname" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn pri" id="xsend">加入调料架</button></div><p class="note" id="xsent"></p></section>
+ </div>
+</main>
+<main class="wrap view" id="v-ai" hidden>
+ <div class="grid">
+  <section class="card"><h2>想做什么菜</h2>
+   <h3>主料（最多 3 样）</h3><div class="chips" id="afcats"></div><div class="sgrid" id="afgrid"></div><div id="afsel"></div>
+   <h3>味型</h3><div class="chips2" id="astyle"></div>
+   <h3>做法</h3><span class="seg" id="amethod"></span>
+   <h3>口感</h3><div class="fl" id="atex"></div>
+   <h3>限制</h3><div class="chips2" id="acons"></div>
+   <div class="fl" style="margin-top:14px"><button class="btn pri" id="ago">设计这道菜</button><button class="btn" id="achef" hidden>请 Claude 主厨设计</button><button class="btn sm" id="astop" hidden>停止</button></div>
+   <p class="note" id="achefnote" hidden style="margin:6px 0 0">“设计这道菜”在本机几秒算完；Claude 主厨会自己构思，在模拟器里试做几次再改，约需 1 分钟。</p>
+   <p class="note" id="astat"></p>
+  </section>
+  <section class="card res" id="ares" hidden><div class="score"><div><h2 id="aname" style="font-size:28px"></h2><div class="tags" id="atypes" style="margin-top:6px"></div></div><div class="big" id="ascore"></div></div>
+   <div class="fig" id="aradar" style="height:280px"><svg role="img" aria-label="设计结果与目标味道"></svg></div>
+   <div class="legend"><span><i style="background:var(--red2)"></i>设计结果</span><span><i style="background:var(--tgt);height:0;border-top:2px dashed var(--tgt)"></i>理想味型</span></div>
+   <h3>设计思路</h3><ul class="hint" id="anotes"></ul>
+   <h3>做法</h3><div id="acard" style="font-size:15px"></div><p class="note" id="awarn"></p>
+   <div class="fl"><button class="btn pri" id="aopen">在工坊打开</button><button class="btn" id="acardbtn">菜谱卡</button><button class="btn" id="asave">存进我的菜谱</button><button class="btn" id="aalt">比较其他做法</button></div>
+   <div class="chips2" id="aalts" style="margin-top:8px"></div>
+  </section>
  </div>
 </main>
 <main class="wrap view" id="v-book" hidden>
