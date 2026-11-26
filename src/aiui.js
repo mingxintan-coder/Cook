@@ -43,7 +43,7 @@ $('aalt').onclick=()=>{$('aalt').disabled=true;$('aalts').textContent='正在比
     $('aalts').onclick=e=>{const b=e.target.closest('button');if(b)show(L[+b.dataset.k],'程序设计')}},30)};
 
 // ---- 冰箱模式 ----
-let F={foods:[],pref:{spicy:'中辣',sweet:'',sour:'',numb:'',heavy:''},time:0,pantryOnly:false,pantry:PANTRY.slice(),cons:{}};let ffcat='肉';let fres=[];
+let F={foods:[],pref:{spicy:'中辣',sweet:'',sour:'',numb:'',heavy:''},time:0,pantryOnly:false,pantry:PANTRY.slice(),cons:{},n:3,soup:true};let menuJobs=null,menuSet=null,menuOut=null,menuTried=[];let ffcat='肉';let fres=[];
 try{const s=JSON.parse(localStorage.getItem('tw.fridge')||'null');if(s&&Array.isArray(s.foods))F=Object.assign(F,s)}catch(e){}
 const saveF=()=>{try{localStorage.setItem('tw.fridge',JSON.stringify(F))}catch(e){}};
 let amode='fridge';try{amode=localStorage.getItem('tw.aimode')||'fridge'}catch(e){}
@@ -55,6 +55,7 @@ function frender(){
   $('ffgrid').innerHTML=Object.values(FD).filter(d=>d.cat===ffcat).map(d=>`<button data-ff="${d.id}" aria-pressed="${F.foods.some(f=>f.id===d.id)}">${esc(d.name)}</button>`).join('');
   $('ffsel').innerHTML=F.foods.length?F.foods.map((f,i)=>`<div class="afrow" data-i="${i}"><b>${esc(FD[f.id].name)}</b><input type="number" min="20" step="50" value="${f.g}" aria-label="克数"><span class="unit">g</span><span></span><button class="x" aria-label="移除">✕</button></div>`).join(''):'<p class="note">还没有食材。</p>';
   $('fpref').innerHTML=PREFS.map(([k,n,opts])=>`<div class="prow"><span>${n}</span><span class="seg" data-p="${k}">${opts.map(o=>`<button data-v="${o}" aria-pressed="${(F.pref[k]||'')===o}">${o||'随意'}</button>`).join('')}</span></div>`).join('');
+  $('fnum').innerHTML=[1,2,3,4,5].map(v=>`<button data-n="${v}" aria-pressed="${(F.n||1)===v}">${v} 道</button>`).join('');$('fsoup').checked=!!F.soup;$('fsoup').disabled=(F.n||1)<2;$('fgo').textContent=(F.n||1)>1?`配一桌 ${F.n} 道菜`:'推荐最好吃的做法';
   $('ftime').innerHTML=[[0,'不限'],[1800,'30 分钟内'],[900,'15 分钟内']].map(([v,n])=>`<button data-t="${v}" aria-pressed="${+F.time===v}">${n}</button>`).join('');
   $('fpo').checked=!!F.pantryOnly;$('fpan').hidden=!F.pantryOnly;
   $('fpan').innerHTML=PANTRY.filter(id=>IT[id]).map(id=>`<button class="chip" data-pa="${id}" aria-pressed="${F.pantry.includes(id)}">${esc(IT[id].name)}</button>`).join('');
@@ -66,11 +67,13 @@ $('pfridge').addEventListener('click',e=>{const b=e.target.closest('button');if(
   else if(b.classList.contains('x')&&b.closest('#ffsel'))F.foods.splice(+b.closest('.afrow').dataset.i,1);
   else if(b.closest('.seg')&&b.closest('.seg').dataset.p)F.pref[b.closest('.seg').dataset.p]=b.dataset.v;
   else if(b.dataset.t!=null&&b.closest('#ftime'))F.time=+b.dataset.t;
+  else if(b.dataset.n)F.n=+b.dataset.n;
   else if(b.dataset.pa){const i=F.pantry.indexOf(b.dataset.pa);if(i>=0)F.pantry.splice(i,1);else F.pantry.push(b.dataset.pa)}
   else if(b.dataset.fco)F.cons[b.dataset.fco]=!F.cons[b.dataset.fco];
   else return;saveF();frender()});
 $('ffsel').addEventListener('change',e=>{const row=e.target.closest('.afrow');if(!row)return;F.foods[+row.dataset.i].g=Math.max(20,+e.target.value||100);saveF()});
 $('fpo').onchange=e=>{F.pantryOnly=e.target.checked;saveF();frender()};
+$('fsoup').onchange=e=>{F.soup=e.target.checked;saveF()};
 const BASES=()=>Object.values(FD).filter(d=>!d.base&&!d.custom);
 let unk=[];
 function addFoods(ids){for(const id of ids)if(!F.foods.some(f=>f.id===id))F.foods.push({id,g:0});for(const f of F.foods)if(!f.g)f.g=defaultG(f.id,F.foods.map(x=>x.id))}
@@ -97,7 +100,9 @@ $('fgo').onclick=()=>{if(!F.foods.length)return;$('fgo').disabled=true;$('frec')
   const plan=fridgePlan(input);const jobs=plan.jobs;let i=0;$('fstat').textContent=`共 ${jobs.length} 种搭配，正在快速试做…`;
   const step1=()=>{const t0=Date.now();while(i<jobs.length&&Date.now()-t0<120){try{quickEval(jobs[i])}catch(e){jobs[i].total=-1}i++}
     $('fstat').textContent=`快速试做 ${i}/${jobs.length}…`;if(i<jobs.length)return setTimeout(step1,0);
-    const lim=+F.time;const ok=jobs.filter(j=>j.total>=0&&(!lim||j.t<=lim*1.3));const top=pickTop(ok,7);if(!top.length){$('fstat').textContent=lim?'这个时间内做不出来，放宽时间试试':'没有合适的搭配';$('fgo').disabled=false;return}
+    const lim=+F.time;const ok=jobs.filter(j=>j.total>=0&&(!lim||j.t<=lim*1.3));
+    if((F.n||1)>1)return makeMenu(ok);
+    const top=pickTop(ok,7);if(!top.length){$('fstat').textContent=lim?'这个时间内做不出来，放宽时间试试':'没有合适的搭配';$('fgo').disabled=false;return}
     let k=0;const out=[];const step2=()=>{const j=top[k];$('fstat').textContent=`细调第 ${k+1}/${top.length} 道：${STYLES[j.spec.style].pre}…`;
       setTimeout(()=>{try{const r=design(j.spec,700);if(!lim||r.r.sim.t<=lim)out.push({r,j,total:tasty(j,r.score)})}catch(e){console.error(e)}k++;if(k<top.length)step2();else done(out)},0)};step2()};
   const done=(out)=>{out=out.filter(x=>x.total>=60).sort((a,b)=>b.total-a.total).slice(0,6);fres=out;$('fgo').disabled=false;$('fstat').textContent=out.length?`推荐 ${out.length} 道，点“看做法”展开`:'没有合适的搭配，试试放宽时间或口味';
@@ -106,6 +111,22 @@ $('fgo').onclick=()=>{if(!F.foods.length)return;$('fgo').disabled=true;$('frec')
 $('frec').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.fv!=null){const x=fres[+b.dataset.fv];show(x.r,`冰箱推荐 · 好吃度 ${x.total}`)}
   if(b.dataset.fs!=null){const x=fres[+b.dataset.fs];bookSave({name:x.r.name,steps:x.r.steps,fin:x.r.fin,eat:x.r.eat,base:'',note:'冰箱推荐 · '+x.r.spec.style+' · '+x.r.spec.method});b.textContent='已存'}});
 setMode(amode);
+
+// ---- 一桌菜 ----
+function makeMenu(jobs){menuJobs=jobs;menuTried=[];const set=menuPlan(jobs,F.n,{soup:F.soup,pref:F.pref});if(!set.length){$('fstat').textContent='没有合适的搭配';$('fgo').disabled=false;return}
+  menuSet=set;menuOut=[];let k=0;const nx=()=>{const j=set[k];$('fstat').textContent=`细调第 ${k+1}/${set.length} 道…`;setTimeout(()=>{try{const r=design(j.spec,700);menuOut[k]={r,j,total:tasty(j,r.score)}}catch(e){console.error(e)}k++;if(k<set.length)nx();else renderMenu()},0)};nx()}
+function renderMenu(){$('fgo').disabled=false;const out=menuOut.filter(Boolean);fres=out;
+  const used=new Set(out.flatMap(x=>x.j.spec.foods.map(f=>f.id)));const left=F.foods.filter(f=>!used.has(f.id)).map(f=>FD[f.id].name.split('/')[0]);
+  const mo=menuOrder(out.map(x=>({name:x.r.name,t:x.r.r.sim.t})));const avg=Math.round(out.reduce((a,x)=>a+x.total,0)/out.length);
+  $('fstat').textContent=out.length<F.n?`食材只够配 ${out.length} 道`:'';
+  $('frec').innerHTML=`<div class="mhead"><b>一桌 ${out.length} 道菜</b><span class="note">平均好吃度 ${avg} · 用了 ${used.size}/${F.foods.length} 样食材 · 全部做完约 ${Math.round(mo.total/60)} 分钟${left.length?` · 没用上：${esc(left.join('、'))}`:''}</span><p style="margin:6px 0 0;font-size:15px">${mo.lines.map(esc).join('<br>')}</p><div class="fl" style="margin-top:8px"><button class="btn sm" id="msave">整桌存进我的菜谱</button><button class="btn sm" id="mcopy">复制整桌菜谱</button><span class="note" id="mmsg"></span></div></div>`+
+   out.map((x,n)=>`<div class="frow"><div class="fs">${x.total}<small>好吃度</small></div><div><b>${esc(x.r.name)}</b><span class="note">${esc(x.r.spec.style)} · ${esc(x.r.spec.method)} · 约 ${Math.max(1,Math.round(x.r.r.sim.t/60))} 分钟 · 用 ${esc(x.j.spec.foods.map(f=>FD[f.id].name.split('/')[0]+' '+f.g+'g').join('、'))}</span><span class="note">${esc(reason(x.j))}</span></div><div class="fl" style="flex-direction:column;align-items:stretch"><button class="btn sm pri" data-fv="${n}">看做法</button><button class="btn sm" data-mswap="${n}">换一道</button></div></div>`).join('');
+  $('msave').onclick=()=>{for(const x of out)bookSave({name:x.r.name,steps:x.r.steps,fin:x.r.fin,eat:x.r.eat,base:'',note:`一桌菜 · ${out.map(o=>o.r.name).join('、')}`});$('mmsg').textContent='已存 '+out.length+' 道'};
+  $('mcopy').onclick=async()=>{const t=[`【一桌 ${out.length} 道菜】`,...mo.lines,''].concat(out.map(x=>cardText(x.r.name,recipeCard(x.r.steps),''))).join('\n\n');try{await navigator.clipboard.writeText(t);$('mmsg').textContent='已复制'}catch(e){$('mmsg').textContent='复制被拦截'}}}
+$('frec').addEventListener('click',e=>{const b=e.target.closest('button[data-mswap]');if(!b||!menuSet)return;const i=+b.dataset.mswap;menuTried[i]=menuTried[i]||new Set();menuTried[i].add(menuSet[i]);let opts=swapOptions(menuJobs,menuSet,i,{}).filter(j=>!menuTried[i].has(j));
+  if(!opts.length){if(menuTried[i].size>1){menuTried[i]=new Set([menuSet[i]]);opts=swapOptions(menuJobs,menuSet,i,{})}}
+  if(!opts.length){b.textContent='没有别的了';return}b.disabled=true;b.textContent='换菜中…';
+  setTimeout(()=>{const j=opts[0];menuSet[i]=j;try{const r=design(j.spec,700);menuOut[i]={r,j,total:tasty(j,r.score)}}catch(err){}renderMenu()},20)});
 
 // ---- Claude 主厨 ----
 const clamp2=(x,a,b)=>Math.max(a,Math.min(b,x));

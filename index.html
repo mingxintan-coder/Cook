@@ -223,6 +223,8 @@ body:not(.showxd) .prow.xd{display:none}
 .csteps li.key{font-weight:500}.kb{display:inline-block;font-size:11px;background:var(--red2);color:#fff;border-radius:4px;padding:0 5px;margin-right:4px;vertical-align:2px}
 .ing p{margin:4px 0;line-height:1.8}.ing p b{color:var(--soy)}
 .ing .it{display:inline-block;white-space:nowrap;margin-right:12px}
+#fnum button[aria-pressed=true]{background:var(--red2);color:#fff}
+.mhead{background:var(--bg);border-radius:12px;padding:12px;margin:10px 0;border:1.5px solid var(--soy)}.mhead b{font-size:18px}
 </style></head><body>
 <header class="top">
  <h1>锅气 · 中餐调味模拟器</h1>
@@ -346,6 +348,8 @@ body:not(.showxd) .prow.xd{display:none}
    <div class="fl"><input id="ftext" placeholder="例如：茼蒿 牛肋条 鸡蛋 番茄（空格或逗号隔开）" style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn" id="fparse">识别</button></div>
    <div id="funk"></div><div class="chips" id="ffcats" style="margin-top:8px"></div><div class="sgrid" id="ffgrid"></div><div id="ffsel"></div>
    <h3>口味</h3><div id="fpref"></div>
+   <h3>做几道菜</h3><div class="fl"><span class="seg" id="fnum"></span><label class="unit"><input type="checkbox" id="fsoup"> 带一个汤</label></div>
+   <p class="note" style="margin:4px 0 0">选 1 道：给出几种不同做法任你挑；选 2–5 道：把食材分到各道菜里，配成一桌，口味做法不重样。</p>
    <h3>时间</h3><span class="seg" id="ftime"></span>
    <h3>调料</h3><label class="unit"><input type="checkbox" id="fpo"> 只用家里有的调料（点掉没有的）</label><div class="chips2" id="fpan" style="margin-top:6px"></div>
    <h3>限制</h3><div class="chips2" id="fcons"></div>
@@ -1437,13 +1441,14 @@ const STYLES={
  '孜然':{ref:'zrrp',kit:[['zr',8,'paste'],['ljm',4,'paste'],['salt',3,'finish'],['yc',80,'veg'],['xcai',12,'finish'],['lj',8,'mar']],pre:'孜然'},
  '葱爆':{ref:'cbyr',kit:[['cong',150,'veg'],['ls',10,'mar'],['lj',8,'mar'],['xc',4,'vinegar'],['salt',1,'finish'],['xyou',4,'finish'],['bhj',1,'mar']],pre:'葱爆'},
  '茄汁':{ref:'fqcd',kit:[['bt',10,'finish'],['salt',3,'finish'],['cong',8,'finish']],pre:'茄汁'},
+ '汤':{ref:null,D:{salt:4.3,umami:6,rich:2.5,fresh:2,pungent:.6,wok:.5,sweet:1},kit:[['salt',4,'finish'],['jiang',8,'aroma'],['cong',10,'finish'],['bhj',.8,'finish'],['xyou',3,'finish'],['lj',8,'wine']],pre:''},
  '蒜香':{ref:null,D:{salt:5.2,umami:5.5,wok:7,pungent:3,sweet:1.2,fresh:2,ferment:1.5,roast:1},kit:[['suan',35,'aroma'],['salt',3,'finish'],['hy',8,'sauce'],['ls',5,'sauce'],['cong',10,'finish']],pre:'蒜香'},
  '五香卤':{ref:'lnr',kit:[['ls',30,'liquid'],['lc',10,'liquid'],['bingt',12,'liquid'],['salt',8,'liquid'],['huj',20,'liquid'],['bj',4,'spice'],['gp',3,'spice'],['xy',.8,'spice'],['cg',3,'spice'],['hj',2,'spice'],['xhx',2,'spice'],['jiang',12,'liquid'],['cong',20,'liquid']],pre:'五香卤'},
 };
-const METHODS_D=['自动','快炒','红烧','炖','蒸','干煸','凉拌'];
+const METHODS_D=['自动','快炒','红烧','炖','蒸','干煸','凉拌','汤'];
 const isMeat=id=>['肉','禽','水产'].includes(FD[id].cat);
 function autoMethod(foods,style){const main=foods[0];const d=FD[main.id];
-  if(style==='红烧')return'红烧';if(style==='五香卤')return'炖';
+  if(style==='汤')return'汤';if(style==='红烧')return'红烧';if(style==='五香卤')return'炖';
   if(d.coll>=40&&(CUTS[main.cut||d.cut]||1)>=1)return style==='咸鲜'?'炖':'红烧';
   if(d.fish&&(main.cut||d.cut).startsWith('整')&&style==='咸鲜'&&foods.length===1)return'蒸';
   if(d.bean)return'干煸';if(main.id==='hg')return'凉拌';return'快炒'}
@@ -1456,7 +1461,7 @@ function buildSteps(spec,amt,P){const S=[];const foods=spec.foods;const mf=foods
   const g=(id,base)=>Math.max(.3,Math.round(base*k*(amt[id]||1)*10)/10);
   const ph=p=>kit.filter(x=>x[2]===p);const add=(c,x)=>S.push({t:'add',c,id:x[0],g:g(x[0],x[1])});
   const meats=foods.filter(f=>isMeat(f.id)),vegs0=foods.filter(f=>!isMeat(f.id));let vegs=vegs0;
-  const fadd=(c,f,prep)=>{const s={t:'add',c,id:f.id,g:f.g,cut:f.cut||FD[f.id].cut};if(prep)s.prep=prep;S.push(s)};
+  const fadd=(c,f,prep)=>{let cut=f.cut||FD[f.id].cut;if(['红烧','炖','汤'].includes(spec.method)&&!f.cut&&['丝','末','液'].includes(cut)&&f.id!=='jd'&&FD[f.id].base!=='jd'&&!['rm'].includes(f.id))cut=isMeat(f.id)?'块':(FD[f.id].leaf?'段':'块');const s={t:'add',c,id:f.id,g:f.g,cut};if(prep)s.prep=prep;S.push(s)};
   const oilId=spec.cons&&spec.cons.lowOil?'hsy':(spec.style==='麻辣'||spec.style==='家常'||spec.style==='宫保'?'cy':'hsy');
   const oil=(base)=>S.push({t:'add',c:'pot',id:oilId,g:Math.round(base*Math.max(.6,Math.min(1.6,k))*(spec.cons&&spec.cons.lowOil?.6:1)*(amt._oil||1))});
   const m=spec.method;const tm=amt._t||1;if(m==='快炒'&&foods.length>1&&foods.some(f=>f.id==='jd'))vegs=vegs0.filter(f=>f.id!=='jd');
@@ -1497,6 +1502,16 @@ function buildSteps(spec,amt,P){const S=[];const foods=spec.foods;const mf=foods
     for(const x of ph('sauce'))add('pot',x);
     if(m==='红烧')S.push({t:'heat',f:3,s:900,u:'reduce'});else{S.push({t:'heat',f:2,s:120})}
     for(const x of ph('finish'))add('pot',x)}
+  else if(m==='汤'){const tough=meats.filter(f=>FD[f.id].coll>=30);
+    if(tough.length){for(const f of tough)fadd('C',f,'blanch');oil(8);for(const x of ph('aroma'))add('pot',x);S.push({t:'heat',f:2,s:20},{t:'pour',from:'C',to:'pot',what:'all'});for(const x of ph('wine'))add('pot',x);S.push({t:'heat',f:3,s:15});
+      S.push({t:'add',c:'pot',id:'rs',g:Math.round(Math.max(800,mf*3)*(amt._w||1))},{t:'heat',f:3,s:1200,u:'boil'});const coll=Math.max(...tough.map(f=>FD[f.id].coll));S.push({t:'heat',f:1,s:Math.min(5400,Math.round(coll*60*1.1*tm)),lid:1});
+      const rest=foods.filter(f=>!tough.includes(f));for(const f of rest.filter(f=>f.id!=='jd'))fadd('pot',f);if(rest.length)S.push({t:'heat',f:2,s:Math.round(Math.max(...rest.map(f=>FD[f.id].cook*60*Math.pow(CUTS[f.cut||FD[f.id].cut]||1,1.3)))*1.3),lid:1})}
+    else{oil(10);for(const x of ph('aroma'))add('pot',x);S.push({t:'heat',f:2,s:20});const tom=foods.filter(f=>['fq','xhs'].includes(f.id)||FD[f.id].base==='fq');for(const f of tom)fadd('pot',f);if(tom.length)S.push({t:'heat',f:3,s:90});
+      S.push({t:'add',c:'pot',id:'qs',g:Math.round(Math.max(600,mf*2.5)*(amt._w||1))},{t:'heat',f:3,s:900,u:'boil'});
+      const rest=foods.filter(f=>!tom.includes(f)&&f.id!=='jd'&&FD[f.id].base!=='jd');const ord=rest.slice().sort((a,b)=>FD[b.id].cook-FD[a.id].cook);
+      for(const f of ord){fadd('pot',f,isMeat(f.id)&&FD[f.id].off>=.005?'blanch':'');S.push({t:'heat',f:2,s:Math.round(Math.max(40,FD[f.id].cook*60*Math.pow(CUTS[f.cut||FD[f.id].cut]||1,1.3)*1.2*tm))})}
+      for(const f of foods.filter(f=>f.id==='jd'||FD[f.id].base==='jd'))fadd('pot',Object.assign({},f,{cut:'液'}));if(foods.some(f=>f.id==='jd'||FD[f.id].base==='jd'))S.push({t:'heat',f:2,s:30})}
+    for(const x of ph('finish'))add('pot',x);S.push({t:'heat',f:2,s:30})}
   else if(m==='蒸'){for(const f of foods)fadd('pot',f);if(have('jiang'))S.push({t:'add',c:'pot',id:'jiang',g:Math.round(10*k)});if(!(spec.cons&&spec.cons.noAlcohol)&&have('lj'))S.push({t:'add',c:'pot',id:'lj',g:Math.round(10*k)});S.push({t:'rest',s:300});
     const ct=Math.max(...foods.map(f=>FD[f.id].cook*60*Math.pow(CUTS[f.cut||FD[f.id].cut]||1,1.3)));S.push({t:'heat',f:3,s:Math.round(ct*1.1*tm),m:'steam'},{t:'drain',c:'pot',kind:'water',keep:0},{t:'pour',from:'pot',to:'C',what:'all'});
     const sk=kit.filter(x=>!['mar','aroma','paste','chili'].includes(x[2]));if(spec.style==='咸鲜'){S.push({t:'add',c:'C',id:have('zyc')?'zyc':'ls',g:g('zyc',22)});for(const x of sk.filter(x=>!['salt','ls','hy'].includes(x[0])))add('C',x)}else for(const x of sk)add('C',x);if(have('cong'))S.push({t:'add',c:'C',id:'cong',g:Math.round(15*k)});S.push({t:'add',c:'pot',id:oilId,g:Math.round(25*Math.min(1.4,k))});S.push({t:'heat',f:3,s:60},{t:'pour',from:'pot',to:'C',what:'all'})}
@@ -1534,8 +1549,8 @@ function designSearch(spec,T,fin,eat,amt,ev,t0,budgetMs){
     if(!imp)break;best=imp;amt=imp.a}
   const fx=fixCooking(best.S,fin,eat,8);const steps=fx.steps;const r=runEval(steps,fin,eat);const L=designScore(r,T,spec);
   return{spec,steps,fin,eat,r,T,L,score:Math.max(0,Math.round(100-L*3)),name:dishName(spec),notes:designNotes(spec,steps,r),ms:Date.now()-t0}}
-const NAMES={'fq+jd|茄汁':'番茄炒蛋','jd+qjz|咸鲜':'青椒炒蛋','jc2+jd|咸鲜':'韭菜炒蛋','jd+mr|咸鲜':'木耳炒蛋','hg+jd|咸鲜':'黄瓜炒蛋','jd+xia|咸鲜':'虾仁炒蛋','lji+qjz|咸鲜':'青椒肉丝','qz+rm|鱼香':'鱼香肉末茄子','lji+mr|鱼香':'鱼香肉丝','jd+xhs|茄汁':'番茄炒蛋','dfu+rm|麻辣':'麻婆豆腐','nr+td|红烧':'土豆烧牛肉','nn+td|红烧':'土豆烧牛腩','pg|糖醋':'糖醋排骨','wh|红烧':'红烧肉','td|酸辣':'酸辣土豆丝','yr|孜然':'孜然羊肉','yr|葱爆':'葱爆羊肉','jt|宫保':'宫保鸡丁','jx|宫保':'宫保鸡丁','xia|宫保':'宫保虾球','baic|酸辣':'酸辣白菜','xlh|蒜香':'蒜蓉西兰花','qz|鱼香':'鱼香茄子','dou|家常':'干煸四季豆','dou|麻辣':'干煸四季豆'};
-function dishName(spec){const key=spec.foods.map(f=>f.id).sort().join('+')+'|'+spec.style;if(NAMES[key])return NAMES[key];const rk=spec.foods.map(f=>{let x=f.id;while(FD[x].base&&FD[FD[x].base])x=FD[x].base;return x}).sort().join('+')+'|'+spec.style;if(NAMES[rk]&&spec.foods.every(f=>!FD[f.id].base))return NAMES[rk];const st=STYLES[spec.style];const fn=spec.foods.map(f=>FD[f.id].name.replace(/\(.*\)|（.*）/g,'').split('/')[0]);
+const NAMES={'fq+jd|汤':'番茄蛋花汤','gzc+jd|汤':'紫菜蛋花汤','dfu+qcai|汤':'青菜豆腐汤','jd+qcai|汤':'青菜蛋花汤','lb+pg|汤':'萝卜排骨汤','dg+pg|汤':'冬瓜排骨汤','fq+jd|茄汁':'番茄炒蛋','jd+qjz|咸鲜':'青椒炒蛋','jc2+jd|咸鲜':'韭菜炒蛋','jd+mr|咸鲜':'木耳炒蛋','hg+jd|咸鲜':'黄瓜炒蛋','jd+xia|咸鲜':'虾仁炒蛋','lji+qjz|咸鲜':'青椒肉丝','qz+rm|鱼香':'鱼香肉末茄子','lji+mr|鱼香':'鱼香肉丝','jd+xhs|茄汁':'番茄炒蛋','dfu+rm|麻辣':'麻婆豆腐','nr+td|红烧':'土豆烧牛肉','nn+td|红烧':'土豆烧牛腩','pg|糖醋':'糖醋排骨','wh|红烧':'红烧肉','td|酸辣':'酸辣土豆丝','yr|孜然':'孜然羊肉','yr|葱爆':'葱爆羊肉','jt|宫保':'宫保鸡丁','jx|宫保':'宫保鸡丁','xia|宫保':'宫保虾球','baic|酸辣':'酸辣白菜','xlh|蒜香':'蒜蓉西兰花','qz|鱼香':'鱼香茄子','dou|家常':'干煸四季豆','dou|麻辣':'干煸四季豆'};
+function dishName(spec){if(spec.style==='汤'){const key=spec.foods.map(f=>f.id).sort().join('+')+'|汤';if(NAMES[key])return NAMES[key];const fs=spec.foods.slice().sort((a,b)=>(isMeat(a.id)?1:0)-(isMeat(b.id)?1:0));return fs.map(f=>FD[f.id].name.replace(/\(.*\)|（.*）/g,'').split('/')[0]).join('')+'汤'}const key=spec.foods.map(f=>f.id).sort().join('+')+'|'+spec.style;if(NAMES[key])return NAMES[key];const rk=spec.foods.map(f=>{let x=f.id;while(FD[x].base&&FD[FD[x].base])x=FD[x].base;return x}).sort().join('+')+'|'+spec.style;if(NAMES[rk]&&spec.foods.every(f=>!FD[f.id].base))return NAMES[rk];const st=STYLES[spec.style];const fn=spec.foods.map(f=>FD[f.id].name.replace(/\(.*\)|（.*）/g,'').split('/')[0]);
   let pre=st.pre;if(spec.style==='咸鲜')pre={'快炒':'清炒','红烧':'红烧','炖':'清炖','蒸':'清蒸','干煸':'干煸','凉拌':'凉拌'}[spec.method]||'清炒';
   if(spec.method==='干煸'&&spec.style!=='咸鲜')pre='干煸';if(spec.method==='凉拌'&&spec.style!=='咸鲜')pre=pre+'拌';
   return pre+fn.join('')}
@@ -1587,12 +1602,13 @@ const FIT={
  '孜然':{yr:1,nr:1,jt:.7,td:.6,qz:.5,xg:.6},
  '葱爆':{yr:1,nr:1,lji:.7,jd:.6},
  '茄汁':{fq:1,jd:.95,nn:.7,xia:.7,dfu:.6,td:.5,xhs:1},
+ '汤':{pg:1,gzdg:1,jt:.9,gzj:1,gwj:1,fq:.9,jd:.8,dfu:.8,qcai:.7,bcai:.6,lb:.9,dg:.9,xg:.8,yu:.9,gyt3:1,nn:.8,gzc:1,ghd:.9,gbs:.7,td:.6,ms:.6,gclam:.9,dy:.6,jzg:.7,yr:.8,gyxz:.9},
  '蒜香':{bcai:1,qcai:1,xlh:1,xia:1,qz:.8,hg:.9,dy:.7,ou:.6,xg:.7,ms:.7},
  '五香卤':{nn:1,zt:1,jz:1,jd:.8,dfu:.6,gdf:.7},
  '咸鲜':{jd:1,xia:1,yu:1,qcai:.8,xlh:.8,xg:.8,baic:.7,jx:.6,dfu:.7,fq:.9,mt:.6,hg:.6,dg:.7,jzg:.7}};
 const PAIRS=[['fq','jd'],['qjz','lji'],['qjz','rm'],['td','nr'],['td','nn'],['td','jt'],['qz','rm'],['mr','jd'],['hg','jd'],['xg','jt'],['dou','rm'],['dfu','rm'],['baic','rm'],['lb','nn'],['lb','pg'],['hlb','lji'],['mr','lji'],['yc','nr'],['qc','lji'],['jc2','jd'],['dy','rm'],['xlh','xia'],['ms','rm'],['xg','qcai'],['qjz','jd'],['ou','pg'],['dg','pg'],['fq','nn'],['td','pg'],['jzg','nr'],['qjz','nr'],['bcai','xia'],['qjz','xia'],['qjz','jt'],['hg','xia'],['xg','lji'],['td','wh'],['qz','qjz'],['td','qjz'],['qjz','wh'],['qc','wh'],['baic','dfu'],['xg','dfu'],['hlb','jt'],['dou','wh'],['ms','baic'],['jd','xia'],['fq','dfu']];
 const PAIRSET=new Set(PAIRS.map(p=>p.slice().sort().join('+')));
-const WHY={'茄汁':'番茄炒出沙，酸甜带鲜，最家常','鱼香':'鱼香汁咸甜酸辣，最下饭','宫保':'煳辣荔枝味，鸡丁虾仁最经典','麻辣':'麻辣鲜香，重口首选','家常':'豆瓣酱香，家常下饭','红烧':'小火慢炖，软糯入味','糖醋':'酸甜开胃，老少都爱','酸辣':'酸辣爽脆，快手开胃','孜然':'孜然焦香，西北风味','葱爆':'大火爆葱，香而不腻','蒜香':'蒜香清爽，突出本味','五香卤':'香料卤透，冷热都能吃','咸鲜':'咸鲜本味，清淡不腻'};
+const WHY={'汤':'清汤暖胃，配菜正好','茄汁':'番茄炒出沙，酸甜带鲜，最家常','鱼香':'鱼香汁咸甜酸辣，最下饭','宫保':'煳辣荔枝味，鸡丁虾仁最经典','麻辣':'麻辣鲜香，重口首选','家常':'豆瓣酱香，家常下饭','红烧':'小火慢炖，软糯入味','糖醋':'酸甜开胃，老少都爱','酸辣':'酸辣爽脆，快手开胃','孜然':'孜然焦香，西北风味','葱爆':'大火爆葱，香而不腻','蒜香':'蒜香清爽，突出本味','五香卤':'香料卤透，冷热都能吃','咸鲜':'咸鲜本味，清淡不腻'};
 const SPICY_STYLES=['宫保','麻辣','家常','酸辣','孜然','鱼香'];
 const HALL={'茄汁':['bt'],'鱼香':['pj'],'宫保':['gla','hj'],'麻辣':['db'],'家常':['db'],'孜然':['zr'],'五香卤':['bj'],'糖醋':['bt'],'酸辣':['bc'],'红烧':['ls'],'葱爆':['cong']};
 const BASIC=['salt','hsy','cy','qs','rs'];
@@ -1628,6 +1644,7 @@ function fridgePlan(input){const foods=input.foods.filter(f=>FD[f.id]);if(!foods
   const gOf=Object.fromEntries(foods.map(f=>[f.id,f.g]));const jobs=[];
   for(const c of combos(foods))for(const style of Object.keys(STYLES)){
     if(input.pref&&input.pref.spicy==='不辣'&&['麻辣','宫保','酸辣','家常'].includes(style))continue;
+    if(style==='汤'&&c.some(id=>rootOf(id)==='jd')&&c.some(id=>isMeatId(id)&&FD[id].coll>=30))continue;
     if(!canStyle(style,pantry))continue;if(style==='茄汁'&&(!c.includes('fq')||c.length<2))continue;const fit=fitScore(style,c);if(fit<.55)continue;
     const spec={foods:c.map(id=>({id,g:gOf[id]||defaultG(id,c)})),style,method:'自动',meat:'',veg:'',cons:Object.assign({},input.cons||{},input.pref&&input.pref.spicy==='不辣'?{noSpicy:true}:{}),missing,pref:input.pref};
     jobs.push({spec,fit,pair:pairScore(c),ps:prefScore(style,input.pref)})}
@@ -1642,6 +1659,36 @@ function pickTop(jobs,n){const L=jobs.filter(j=>j.total>=55).sort((a,b)=>b.total
     if(out.some(o=>o.spec.foods.map(f=>f.id).slice().sort().join('+')===ck&&o.spec.style===st))continue;
     perCombo[ck]=(perCombo[ck]||0)+1;perStyle[st]=(perStyle[st]||0)+1;ids.forEach(i=>perFood[i]=(perFood[i]||0)+1);out.push(j);if(out.length>=n)break}
   return out}
+// 一桌菜：食材不重复、口味做法有变化、能带一个汤
+function menuPlan(jobs,n,opt){opt=opt||{};const C=jobs.filter(j=>j.total>=30).sort((a,b)=>b.total-a.total).slice(0,90);const allFoods=new Set(jobs.flatMap(j=>j.spec.foods.map(f=>f.id)));
+  const ids=j=>j.spec.foods.map(f=>f.id);const isSoup=j=>j.spec.style==='汤';const meatDish=j=>ids(j).some(isMeatId);
+  const ok=(set,j)=>{const u=new Set(set.flatMap(ids));return !ids(j).some(i=>u.has(i))};
+  const per=Math.max(1,Math.ceil(allFoods.size/n));const score=set=>{let s=set.reduce((a,j)=>a+j.total,0)+set.length*40;const used=new Set(set.flatMap(ids));s+=used.size*5-(allFoods.size-used.size)*2;for(const j of set)if(ids(j).length>per)s-=10*(ids(j).length-per);
+    const st={},me={};for(const j of set){st[j.spec.style]=(st[j.spec.style]||0)+1;const m=autoMethod(j.spec.foods,j.spec.style);me[m]=(me[m]||0)+1}
+    for(const k in st)if(st[k]>1)s-=22*(st[k]-1);for(const k in me)if(me[k]>2)s-=6*(me[k]-2);
+    const sp=set.filter(j=>SPICY_STYLES.includes(j.spec.style)).length;if(!(opt.pref&&opt.pref.spicy==='重辣')&&sp>Math.ceil(set.length/2))s-=8*(sp-Math.ceil(set.length/2));
+    const soups=set.filter(isSoup).length;if(opt.soup){s+=soups?10:-45;if(soups>1)s-=25*(soups-1)}else if(soups>1)s-=25;
+    if(set.length>=3&&!set.some(j=>!meatDish(j)&&!isSoup(j)))s-=6;if(set.length>=2&&!set.some(meatDish))s-=4;return s};
+  const grow=(start)=>{let set=start.slice();for(let k=set.length;k<n;k++){let best=null,bs=-1e9;for(const j of C){if(set.includes(j)||!ok(set,j))continue;const v=score(set.concat([j]));if(v>bs){bs=v;best=j}}if(!best)break;set.push(best)}
+    for(let round=0;round<6;round++){let changed=false;for(let i=0;i<set.length;i++){const others=set.filter((_,k)=>k!==i);let cur=score(set);for(const j of C){if(set.includes(j)||!ok(others,j))continue;const t=others.slice(0,i).concat([j],others.slice(i));const v=score(t);if(v>cur+.5){set=t;cur=v;changed=true}}}if(!changed)break}return set};
+  const starts=[[]].concat(C.filter(j=>!isSoup(j)).slice(0,4).map(j=>[j]),opt.soup?C.filter(isSoup).slice(0,5).map(j=>[j]):[]);
+  if(opt.soup)for(const a of C.filter(j=>!isSoup(j)).slice(0,3))for(const b of C.filter(isSoup).slice(0,4))if(ok([a],b))starts.push([a,b]);
+  let set=[],bestS=-1e9;for(const st of starts){if(st.length>n)continue;const s2=grow(st);const v=score(s2);if(v>bestS){bestS=v;set=s2}}
+  // 菜数不够：把一道多食材的菜拆成两道
+  for(let guard=0;guard<4&&set.length<n;guard++){let best=null,bs=score(set);
+    for(let i=0;i<set.length;i++){const d=set[i];const fs=ids(d);if(fs.length<2)continue;const others=set.filter((_,k)=>k!==i);
+      const pool=C.filter(j=>ids(j).every(x=>fs.includes(x))&&ok(others,j));
+      for(let a=0;a<pool.length;a++)for(let b=a+1;b<pool.length;b++){const A=pool[a],B=pool[b];if(ids(A).some(x=>ids(B).includes(x)))continue;const t=others.concat([A,B]);const v=score(t);if(v>bs){bs=v;best=t}}}
+    if(!best)break;set=best}
+  return set}
+function swapOptions(jobs,set,i,opt){const others=set.filter((_,k)=>k!==i);const u=new Set(others.flatMap(j=>j.spec.foods.map(f=>f.id)));const styles=new Set(others.map(j=>j.spec.style));
+  const freed=set[i].spec.foods.map(f=>f.id);const cur=set[i];const val=j=>j.total+8*j.spec.foods.filter(f=>freed.includes(f.id)).length-6*freed.filter(x=>!j.spec.foods.some(f=>f.id===x)).length;
+  return jobs.filter(j=>j.total>=30&&j!==cur&&!set.includes(j)&&!j.spec.foods.some(f=>u.has(f.id))&&!styles.has(j.spec.style)&&!(j.spec.style===cur.spec.style&&j.spec.foods.map(f=>f.id).sort().join()===freed.slice().sort().join())).sort((a,b)=>val(b)-val(a)).slice(0,8)}
+function menuOrder(items){const L=items.slice().sort((a,b)=>b.t-a.t);const long=L.filter(x=>x.t>=1500),quick=L.filter(x=>x.t<1500);const qsum=quick.reduce((a,x)=>a+x.t,0);
+  const total=Math.max(long.length?long[0].t:0,qsum+(long.length?600:0));const lines=[];
+  if(long.length)lines.push(`先做${long.map(x=>`「${x.name}」（约 ${Math.round(x.t/60)} 分钟）`).join('和')}，炖着的时候备其他菜的料。`);
+  if(quick.length)lines.push(`${long.length?`出锅前约 ${Math.max(10,Math.round(qsum/60)+5)} 分钟`:'按顺序'}依次做${quick.map(x=>`「${x.name}」`).join('、')}，快手菜最后做，上桌最热。`);
+  return{lines,total}}
 function reason(job){const fn=job.spec.foods.map(f=>FD[f.id].name.split('/')[0].replace(/\(.*\)/,''));let s=WHY[job.spec.style]||'';
   const ids=job.spec.foods.map(f=>f.id);for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)if(isPair(ids[i],ids[j]))s=`${fn[i]}配${fn[j]}是经典搭配；`+s;
   if(fitScore(job.spec.style,[ids[0]])>=1)s+=`，${fn[0]}最适合这个味型`;return s}
@@ -2039,7 +2086,7 @@ $('aalt').onclick=()=>{$('aalt').disabled=true;$('aalts').textContent='正在比
     $('aalts').onclick=e=>{const b=e.target.closest('button');if(b)show(L[+b.dataset.k],'程序设计')}},30)};
 
 // ---- 冰箱模式 ----
-let F={foods:[],pref:{spicy:'中辣',sweet:'',sour:'',numb:'',heavy:''},time:0,pantryOnly:false,pantry:PANTRY.slice(),cons:{}};let ffcat='肉';let fres=[];
+let F={foods:[],pref:{spicy:'中辣',sweet:'',sour:'',numb:'',heavy:''},time:0,pantryOnly:false,pantry:PANTRY.slice(),cons:{},n:3,soup:true};let menuJobs=null,menuSet=null,menuOut=null,menuTried=[];let ffcat='肉';let fres=[];
 try{const s=JSON.parse(localStorage.getItem('tw.fridge')||'null');if(s&&Array.isArray(s.foods))F=Object.assign(F,s)}catch(e){}
 const saveF=()=>{try{localStorage.setItem('tw.fridge',JSON.stringify(F))}catch(e){}};
 let amode='fridge';try{amode=localStorage.getItem('tw.aimode')||'fridge'}catch(e){}
@@ -2051,6 +2098,7 @@ function frender(){
   $('ffgrid').innerHTML=Object.values(FD).filter(d=>d.cat===ffcat).map(d=>`<button data-ff="${d.id}" aria-pressed="${F.foods.some(f=>f.id===d.id)}">${esc(d.name)}</button>`).join('');
   $('ffsel').innerHTML=F.foods.length?F.foods.map((f,i)=>`<div class="afrow" data-i="${i}"><b>${esc(FD[f.id].name)}</b><input type="number" min="20" step="50" value="${f.g}" aria-label="克数"><span class="unit">g</span><span></span><button class="x" aria-label="移除">✕</button></div>`).join(''):'<p class="note">还没有食材。</p>';
   $('fpref').innerHTML=PREFS.map(([k,n,opts])=>`<div class="prow"><span>${n}</span><span class="seg" data-p="${k}">${opts.map(o=>`<button data-v="${o}" aria-pressed="${(F.pref[k]||'')===o}">${o||'随意'}</button>`).join('')}</span></div>`).join('');
+  $('fnum').innerHTML=[1,2,3,4,5].map(v=>`<button data-n="${v}" aria-pressed="${(F.n||1)===v}">${v} 道</button>`).join('');$('fsoup').checked=!!F.soup;$('fsoup').disabled=(F.n||1)<2;$('fgo').textContent=(F.n||1)>1?`配一桌 ${F.n} 道菜`:'推荐最好吃的做法';
   $('ftime').innerHTML=[[0,'不限'],[1800,'30 分钟内'],[900,'15 分钟内']].map(([v,n])=>`<button data-t="${v}" aria-pressed="${+F.time===v}">${n}</button>`).join('');
   $('fpo').checked=!!F.pantryOnly;$('fpan').hidden=!F.pantryOnly;
   $('fpan').innerHTML=PANTRY.filter(id=>IT[id]).map(id=>`<button class="chip" data-pa="${id}" aria-pressed="${F.pantry.includes(id)}">${esc(IT[id].name)}</button>`).join('');
@@ -2062,11 +2110,13 @@ $('pfridge').addEventListener('click',e=>{const b=e.target.closest('button');if(
   else if(b.classList.contains('x')&&b.closest('#ffsel'))F.foods.splice(+b.closest('.afrow').dataset.i,1);
   else if(b.closest('.seg')&&b.closest('.seg').dataset.p)F.pref[b.closest('.seg').dataset.p]=b.dataset.v;
   else if(b.dataset.t!=null&&b.closest('#ftime'))F.time=+b.dataset.t;
+  else if(b.dataset.n)F.n=+b.dataset.n;
   else if(b.dataset.pa){const i=F.pantry.indexOf(b.dataset.pa);if(i>=0)F.pantry.splice(i,1);else F.pantry.push(b.dataset.pa)}
   else if(b.dataset.fco)F.cons[b.dataset.fco]=!F.cons[b.dataset.fco];
   else return;saveF();frender()});
 $('ffsel').addEventListener('change',e=>{const row=e.target.closest('.afrow');if(!row)return;F.foods[+row.dataset.i].g=Math.max(20,+e.target.value||100);saveF()});
 $('fpo').onchange=e=>{F.pantryOnly=e.target.checked;saveF();frender()};
+$('fsoup').onchange=e=>{F.soup=e.target.checked;saveF()};
 const BASES=()=>Object.values(FD).filter(d=>!d.base&&!d.custom);
 let unk=[];
 function addFoods(ids){for(const id of ids)if(!F.foods.some(f=>f.id===id))F.foods.push({id,g:0});for(const f of F.foods)if(!f.g)f.g=defaultG(f.id,F.foods.map(x=>x.id))}
@@ -2093,7 +2143,9 @@ $('fgo').onclick=()=>{if(!F.foods.length)return;$('fgo').disabled=true;$('frec')
   const plan=fridgePlan(input);const jobs=plan.jobs;let i=0;$('fstat').textContent=`共 ${jobs.length} 种搭配，正在快速试做…`;
   const step1=()=>{const t0=Date.now();while(i<jobs.length&&Date.now()-t0<120){try{quickEval(jobs[i])}catch(e){jobs[i].total=-1}i++}
     $('fstat').textContent=`快速试做 ${i}/${jobs.length}…`;if(i<jobs.length)return setTimeout(step1,0);
-    const lim=+F.time;const ok=jobs.filter(j=>j.total>=0&&(!lim||j.t<=lim*1.3));const top=pickTop(ok,7);if(!top.length){$('fstat').textContent=lim?'这个时间内做不出来，放宽时间试试':'没有合适的搭配';$('fgo').disabled=false;return}
+    const lim=+F.time;const ok=jobs.filter(j=>j.total>=0&&(!lim||j.t<=lim*1.3));
+    if((F.n||1)>1)return makeMenu(ok);
+    const top=pickTop(ok,7);if(!top.length){$('fstat').textContent=lim?'这个时间内做不出来，放宽时间试试':'没有合适的搭配';$('fgo').disabled=false;return}
     let k=0;const out=[];const step2=()=>{const j=top[k];$('fstat').textContent=`细调第 ${k+1}/${top.length} 道：${STYLES[j.spec.style].pre}…`;
       setTimeout(()=>{try{const r=design(j.spec,700);if(!lim||r.r.sim.t<=lim)out.push({r,j,total:tasty(j,r.score)})}catch(e){console.error(e)}k++;if(k<top.length)step2();else done(out)},0)};step2()};
   const done=(out)=>{out=out.filter(x=>x.total>=60).sort((a,b)=>b.total-a.total).slice(0,6);fres=out;$('fgo').disabled=false;$('fstat').textContent=out.length?`推荐 ${out.length} 道，点“看做法”展开`:'没有合适的搭配，试试放宽时间或口味';
@@ -2102,6 +2154,22 @@ $('fgo').onclick=()=>{if(!F.foods.length)return;$('fgo').disabled=true;$('frec')
 $('frec').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.fv!=null){const x=fres[+b.dataset.fv];show(x.r,`冰箱推荐 · 好吃度 ${x.total}`)}
   if(b.dataset.fs!=null){const x=fres[+b.dataset.fs];bookSave({name:x.r.name,steps:x.r.steps,fin:x.r.fin,eat:x.r.eat,base:'',note:'冰箱推荐 · '+x.r.spec.style+' · '+x.r.spec.method});b.textContent='已存'}});
 setMode(amode);
+
+// ---- 一桌菜 ----
+function makeMenu(jobs){menuJobs=jobs;menuTried=[];const set=menuPlan(jobs,F.n,{soup:F.soup,pref:F.pref});if(!set.length){$('fstat').textContent='没有合适的搭配';$('fgo').disabled=false;return}
+  menuSet=set;menuOut=[];let k=0;const nx=()=>{const j=set[k];$('fstat').textContent=`细调第 ${k+1}/${set.length} 道…`;setTimeout(()=>{try{const r=design(j.spec,700);menuOut[k]={r,j,total:tasty(j,r.score)}}catch(e){console.error(e)}k++;if(k<set.length)nx();else renderMenu()},0)};nx()}
+function renderMenu(){$('fgo').disabled=false;const out=menuOut.filter(Boolean);fres=out;
+  const used=new Set(out.flatMap(x=>x.j.spec.foods.map(f=>f.id)));const left=F.foods.filter(f=>!used.has(f.id)).map(f=>FD[f.id].name.split('/')[0]);
+  const mo=menuOrder(out.map(x=>({name:x.r.name,t:x.r.r.sim.t})));const avg=Math.round(out.reduce((a,x)=>a+x.total,0)/out.length);
+  $('fstat').textContent=out.length<F.n?`食材只够配 ${out.length} 道`:'';
+  $('frec').innerHTML=`<div class="mhead"><b>一桌 ${out.length} 道菜</b><span class="note">平均好吃度 ${avg} · 用了 ${used.size}/${F.foods.length} 样食材 · 全部做完约 ${Math.round(mo.total/60)} 分钟${left.length?` · 没用上：${esc(left.join('、'))}`:''}</span><p style="margin:6px 0 0;font-size:15px">${mo.lines.map(esc).join('<br>')}</p><div class="fl" style="margin-top:8px"><button class="btn sm" id="msave">整桌存进我的菜谱</button><button class="btn sm" id="mcopy">复制整桌菜谱</button><span class="note" id="mmsg"></span></div></div>`+
+   out.map((x,n)=>`<div class="frow"><div class="fs">${x.total}<small>好吃度</small></div><div><b>${esc(x.r.name)}</b><span class="note">${esc(x.r.spec.style)} · ${esc(x.r.spec.method)} · 约 ${Math.max(1,Math.round(x.r.r.sim.t/60))} 分钟 · 用 ${esc(x.j.spec.foods.map(f=>FD[f.id].name.split('/')[0]+' '+f.g+'g').join('、'))}</span><span class="note">${esc(reason(x.j))}</span></div><div class="fl" style="flex-direction:column;align-items:stretch"><button class="btn sm pri" data-fv="${n}">看做法</button><button class="btn sm" data-mswap="${n}">换一道</button></div></div>`).join('');
+  $('msave').onclick=()=>{for(const x of out)bookSave({name:x.r.name,steps:x.r.steps,fin:x.r.fin,eat:x.r.eat,base:'',note:`一桌菜 · ${out.map(o=>o.r.name).join('、')}`});$('mmsg').textContent='已存 '+out.length+' 道'};
+  $('mcopy').onclick=async()=>{const t=[`【一桌 ${out.length} 道菜】`,...mo.lines,''].concat(out.map(x=>cardText(x.r.name,recipeCard(x.r.steps),''))).join('\n\n');try{await navigator.clipboard.writeText(t);$('mmsg').textContent='已复制'}catch(e){$('mmsg').textContent='复制被拦截'}}}
+$('frec').addEventListener('click',e=>{const b=e.target.closest('button[data-mswap]');if(!b||!menuSet)return;const i=+b.dataset.mswap;menuTried[i]=menuTried[i]||new Set();menuTried[i].add(menuSet[i]);let opts=swapOptions(menuJobs,menuSet,i,{}).filter(j=>!menuTried[i].has(j));
+  if(!opts.length){if(menuTried[i].size>1){menuTried[i]=new Set([menuSet[i]]);opts=swapOptions(menuJobs,menuSet,i,{})}}
+  if(!opts.length){b.textContent='没有别的了';return}b.disabled=true;b.textContent='换菜中…';
+  setTimeout(()=>{const j=opts[0];menuSet[i]=j;try{const r=design(j.spec,700);menuOut[i]={r,j,total:tasty(j,r.score)}}catch(err){}renderMenu()},20)});
 
 // ---- Claude 主厨 ----
 const clamp2=(x,a,b)=>Math.max(a,Math.min(b,x));

@@ -223,6 +223,8 @@ body:not(.showxd) .prow.xd{display:none}
 .csteps li.key{font-weight:500}.kb{display:inline-block;font-size:11px;background:var(--red2);color:#fff;border-radius:4px;padding:0 5px;margin-right:4px;vertical-align:2px}
 .ing p{margin:4px 0;line-height:1.8}.ing p b{color:var(--soy)}
 .ing .it{display:inline-block;white-space:nowrap;margin-right:12px}
+#fnum button[aria-pressed=true]{background:var(--red2);color:#fff}
+.mhead{background:var(--bg);border-radius:12px;padding:12px;margin:10px 0;border:1.5px solid var(--soy)}.mhead b{font-size:18px}
 </style></head><body>
 <header class="top">
  <h1>锅气 · 中餐调味模拟器</h1>
@@ -346,6 +348,8 @@ body:not(.showxd) .prow.xd{display:none}
    <div class="fl"><input id="ftext" placeholder="例如：茼蒿 牛肋条 鸡蛋 番茄（空格或逗号隔开）" style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:44px;background:var(--bg);font-size:16px"><button class="btn" id="fparse">识别</button></div>
    <div id="funk"></div><div class="chips" id="ffcats" style="margin-top:8px"></div><div class="sgrid" id="ffgrid"></div><div id="ffsel"></div>
    <h3>口味</h3><div id="fpref"></div>
+   <h3>做几道菜</h3><div class="fl"><span class="seg" id="fnum"></span><label class="unit"><input type="checkbox" id="fsoup"> 带一个汤</label></div>
+   <p class="note" style="margin:4px 0 0">选 1 道：给出几种不同做法任你挑；选 2–5 道：把食材分到各道菜里，配成一桌，口味做法不重样。</p>
    <h3>时间</h3><span class="seg" id="ftime"></span>
    <h3>调料</h3><label class="unit"><input type="checkbox" id="fpo"> 只用家里有的调料（点掉没有的）</label><div class="chips2" id="fpan" style="margin-top:6px"></div>
    <h3>限制</h3><div class="chips2" id="fcons"></div>

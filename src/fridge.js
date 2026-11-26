@@ -32,12 +32,13 @@ const FIT={
  '孜然':{yr:1,nr:1,jt:.7,td:.6,qz:.5,xg:.6},
  '葱爆':{yr:1,nr:1,lji:.7,jd:.6},
  '茄汁':{fq:1,jd:.95,nn:.7,xia:.7,dfu:.6,td:.5,xhs:1},
+ '汤':{pg:1,gzdg:1,jt:.9,gzj:1,gwj:1,fq:.9,jd:.8,dfu:.8,qcai:.7,bcai:.6,lb:.9,dg:.9,xg:.8,yu:.9,gyt3:1,nn:.8,gzc:1,ghd:.9,gbs:.7,td:.6,ms:.6,gclam:.9,dy:.6,jzg:.7,yr:.8,gyxz:.9},
  '蒜香':{bcai:1,qcai:1,xlh:1,xia:1,qz:.8,hg:.9,dy:.7,ou:.6,xg:.7,ms:.7},
  '五香卤':{nn:1,zt:1,jz:1,jd:.8,dfu:.6,gdf:.7},
  '咸鲜':{jd:1,xia:1,yu:1,qcai:.8,xlh:.8,xg:.8,baic:.7,jx:.6,dfu:.7,fq:.9,mt:.6,hg:.6,dg:.7,jzg:.7}};
 const PAIRS=[['fq','jd'],['qjz','lji'],['qjz','rm'],['td','nr'],['td','nn'],['td','jt'],['qz','rm'],['mr','jd'],['hg','jd'],['xg','jt'],['dou','rm'],['dfu','rm'],['baic','rm'],['lb','nn'],['lb','pg'],['hlb','lji'],['mr','lji'],['yc','nr'],['qc','lji'],['jc2','jd'],['dy','rm'],['xlh','xia'],['ms','rm'],['xg','qcai'],['qjz','jd'],['ou','pg'],['dg','pg'],['fq','nn'],['td','pg'],['jzg','nr'],['qjz','nr'],['bcai','xia'],['qjz','xia'],['qjz','jt'],['hg','xia'],['xg','lji'],['td','wh'],['qz','qjz'],['td','qjz'],['qjz','wh'],['qc','wh'],['baic','dfu'],['xg','dfu'],['hlb','jt'],['dou','wh'],['ms','baic'],['jd','xia'],['fq','dfu']];
 const PAIRSET=new Set(PAIRS.map(p=>p.slice().sort().join('+')));
-const WHY={'茄汁':'番茄炒出沙，酸甜带鲜，最家常','鱼香':'鱼香汁咸甜酸辣，最下饭','宫保':'煳辣荔枝味，鸡丁虾仁最经典','麻辣':'麻辣鲜香，重口首选','家常':'豆瓣酱香，家常下饭','红烧':'小火慢炖，软糯入味','糖醋':'酸甜开胃，老少都爱','酸辣':'酸辣爽脆，快手开胃','孜然':'孜然焦香，西北风味','葱爆':'大火爆葱，香而不腻','蒜香':'蒜香清爽，突出本味','五香卤':'香料卤透，冷热都能吃','咸鲜':'咸鲜本味，清淡不腻'};
+const WHY={'汤':'清汤暖胃，配菜正好','茄汁':'番茄炒出沙，酸甜带鲜，最家常','鱼香':'鱼香汁咸甜酸辣，最下饭','宫保':'煳辣荔枝味，鸡丁虾仁最经典','麻辣':'麻辣鲜香，重口首选','家常':'豆瓣酱香，家常下饭','红烧':'小火慢炖，软糯入味','糖醋':'酸甜开胃，老少都爱','酸辣':'酸辣爽脆，快手开胃','孜然':'孜然焦香，西北风味','葱爆':'大火爆葱，香而不腻','蒜香':'蒜香清爽，突出本味','五香卤':'香料卤透，冷热都能吃','咸鲜':'咸鲜本味，清淡不腻'};
 const SPICY_STYLES=['宫保','麻辣','家常','酸辣','孜然','鱼香'];
 const HALL={'茄汁':['bt'],'鱼香':['pj'],'宫保':['gla','hj'],'麻辣':['db'],'家常':['db'],'孜然':['zr'],'五香卤':['bj'],'糖醋':['bt'],'酸辣':['bc'],'红烧':['ls'],'葱爆':['cong']};
 const BASIC=['salt','hsy','cy','qs','rs'];
@@ -73,6 +74,7 @@ function fridgePlan(input){const foods=input.foods.filter(f=>FD[f.id]);if(!foods
   const gOf=Object.fromEntries(foods.map(f=>[f.id,f.g]));const jobs=[];
   for(const c of combos(foods))for(const style of Object.keys(STYLES)){
     if(input.pref&&input.pref.spicy==='不辣'&&['麻辣','宫保','酸辣','家常'].includes(style))continue;
+    if(style==='汤'&&c.some(id=>rootOf(id)==='jd')&&c.some(id=>isMeatId(id)&&FD[id].coll>=30))continue;
     if(!canStyle(style,pantry))continue;if(style==='茄汁'&&(!c.includes('fq')||c.length<2))continue;const fit=fitScore(style,c);if(fit<.55)continue;
     const spec={foods:c.map(id=>({id,g:gOf[id]||defaultG(id,c)})),style,method:'自动',meat:'',veg:'',cons:Object.assign({},input.cons||{},input.pref&&input.pref.spicy==='不辣'?{noSpicy:true}:{}),missing,pref:input.pref};
     jobs.push({spec,fit,pair:pairScore(c),ps:prefScore(style,input.pref)})}
@@ -87,7 +89,37 @@ function pickTop(jobs,n){const L=jobs.filter(j=>j.total>=55).sort((a,b)=>b.total
     if(out.some(o=>o.spec.foods.map(f=>f.id).slice().sort().join('+')===ck&&o.spec.style===st))continue;
     perCombo[ck]=(perCombo[ck]||0)+1;perStyle[st]=(perStyle[st]||0)+1;ids.forEach(i=>perFood[i]=(perFood[i]||0)+1);out.push(j);if(out.length>=n)break}
   return out}
+// 一桌菜：食材不重复、口味做法有变化、能带一个汤
+function menuPlan(jobs,n,opt){opt=opt||{};const C=jobs.filter(j=>j.total>=30).sort((a,b)=>b.total-a.total).slice(0,90);const allFoods=new Set(jobs.flatMap(j=>j.spec.foods.map(f=>f.id)));
+  const ids=j=>j.spec.foods.map(f=>f.id);const isSoup=j=>j.spec.style==='汤';const meatDish=j=>ids(j).some(isMeatId);
+  const ok=(set,j)=>{const u=new Set(set.flatMap(ids));return !ids(j).some(i=>u.has(i))};
+  const per=Math.max(1,Math.ceil(allFoods.size/n));const score=set=>{let s=set.reduce((a,j)=>a+j.total,0)+set.length*40;const used=new Set(set.flatMap(ids));s+=used.size*5-(allFoods.size-used.size)*2;for(const j of set)if(ids(j).length>per)s-=10*(ids(j).length-per);
+    const st={},me={};for(const j of set){st[j.spec.style]=(st[j.spec.style]||0)+1;const m=autoMethod(j.spec.foods,j.spec.style);me[m]=(me[m]||0)+1}
+    for(const k in st)if(st[k]>1)s-=22*(st[k]-1);for(const k in me)if(me[k]>2)s-=6*(me[k]-2);
+    const sp=set.filter(j=>SPICY_STYLES.includes(j.spec.style)).length;if(!(opt.pref&&opt.pref.spicy==='重辣')&&sp>Math.ceil(set.length/2))s-=8*(sp-Math.ceil(set.length/2));
+    const soups=set.filter(isSoup).length;if(opt.soup){s+=soups?10:-45;if(soups>1)s-=25*(soups-1)}else if(soups>1)s-=25;
+    if(set.length>=3&&!set.some(j=>!meatDish(j)&&!isSoup(j)))s-=6;if(set.length>=2&&!set.some(meatDish))s-=4;return s};
+  const grow=(start)=>{let set=start.slice();for(let k=set.length;k<n;k++){let best=null,bs=-1e9;for(const j of C){if(set.includes(j)||!ok(set,j))continue;const v=score(set.concat([j]));if(v>bs){bs=v;best=j}}if(!best)break;set.push(best)}
+    for(let round=0;round<6;round++){let changed=false;for(let i=0;i<set.length;i++){const others=set.filter((_,k)=>k!==i);let cur=score(set);for(const j of C){if(set.includes(j)||!ok(others,j))continue;const t=others.slice(0,i).concat([j],others.slice(i));const v=score(t);if(v>cur+.5){set=t;cur=v;changed=true}}}if(!changed)break}return set};
+  const starts=[[]].concat(C.filter(j=>!isSoup(j)).slice(0,4).map(j=>[j]),opt.soup?C.filter(isSoup).slice(0,5).map(j=>[j]):[]);
+  if(opt.soup)for(const a of C.filter(j=>!isSoup(j)).slice(0,3))for(const b of C.filter(isSoup).slice(0,4))if(ok([a],b))starts.push([a,b]);
+  let set=[],bestS=-1e9;for(const st of starts){if(st.length>n)continue;const s2=grow(st);const v=score(s2);if(v>bestS){bestS=v;set=s2}}
+  // 菜数不够：把一道多食材的菜拆成两道
+  for(let guard=0;guard<4&&set.length<n;guard++){let best=null,bs=score(set);
+    for(let i=0;i<set.length;i++){const d=set[i];const fs=ids(d);if(fs.length<2)continue;const others=set.filter((_,k)=>k!==i);
+      const pool=C.filter(j=>ids(j).every(x=>fs.includes(x))&&ok(others,j));
+      for(let a=0;a<pool.length;a++)for(let b=a+1;b<pool.length;b++){const A=pool[a],B=pool[b];if(ids(A).some(x=>ids(B).includes(x)))continue;const t=others.concat([A,B]);const v=score(t);if(v>bs){bs=v;best=t}}}
+    if(!best)break;set=best}
+  return set}
+function swapOptions(jobs,set,i,opt){const others=set.filter((_,k)=>k!==i);const u=new Set(others.flatMap(j=>j.spec.foods.map(f=>f.id)));const styles=new Set(others.map(j=>j.spec.style));
+  const freed=set[i].spec.foods.map(f=>f.id);const cur=set[i];const val=j=>j.total+8*j.spec.foods.filter(f=>freed.includes(f.id)).length-6*freed.filter(x=>!j.spec.foods.some(f=>f.id===x)).length;
+  return jobs.filter(j=>j.total>=30&&j!==cur&&!set.includes(j)&&!j.spec.foods.some(f=>u.has(f.id))&&!styles.has(j.spec.style)&&!(j.spec.style===cur.spec.style&&j.spec.foods.map(f=>f.id).sort().join()===freed.slice().sort().join())).sort((a,b)=>val(b)-val(a)).slice(0,8)}
+function menuOrder(items){const L=items.slice().sort((a,b)=>b.t-a.t);const long=L.filter(x=>x.t>=1500),quick=L.filter(x=>x.t<1500);const qsum=quick.reduce((a,x)=>a+x.t,0);
+  const total=Math.max(long.length?long[0].t:0,qsum+(long.length?600:0));const lines=[];
+  if(long.length)lines.push(`先做${long.map(x=>`「${x.name}」（约 ${Math.round(x.t/60)} 分钟）`).join('和')}，炖着的时候备其他菜的料。`);
+  if(quick.length)lines.push(`${long.length?`出锅前约 ${Math.max(10,Math.round(qsum/60)+5)} 分钟`:'按顺序'}依次做${quick.map(x=>`「${x.name}」`).join('、')}，快手菜最后做，上桌最热。`);
+  return{lines,total}}
 function reason(job){const fn=job.spec.foods.map(f=>FD[f.id].name.split('/')[0].replace(/\(.*\)/,''));let s=WHY[job.spec.style]||'';
   const ids=job.spec.foods.map(f=>f.id);for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)if(isPair(ids[i],ids[j]))s=`${fn[i]}配${fn[j]}是经典搭配；`+s;
   if(fitScore(job.spec.style,[ids[0]])>=1)s+=`，${fn[0]}最适合这个味型`;return s}
-if(typeof module!=='undefined')module.exports={parseFoodsX,pickTop,parseSeas,parseFoods,fridgePlan,quickEval,tasty,reason,PANTRY};
+if(typeof module!=='undefined')module.exports={menuPlan,swapOptions,menuOrder,parseFoodsX,pickTop,parseSeas,parseFoods,fridgePlan,quickEval,tasty,reason,PANTRY};
