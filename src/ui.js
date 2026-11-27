@@ -100,6 +100,14 @@ function simpleView(){const box=$('simpleView');if(!st.steps.length){box.innerHT
   let card;try{card=recipeCard(st.steps)}catch(e){box.textContent='';return}
   box.innerHTML=cardHTML(card)+`<div class="fl"><button class="btn sm" id="toCard">菜谱卡 / 存菜谱</button><button class="btn sm" id="toFull">改步骤、用量和火候 →</button></div>`;
   $('toFull').onclick=()=>setV('full');$('toCard').onclick=()=>$('wcard').click()}
+// 口感对不上时给个改法
+function texAdvice(want,got){const has=(s,...k)=>k.some(x=>s.includes(x));
+  if(has(got,'生','未熟透','七八成熟'))return'加热不够，延长这一段的时间或开大火';
+  if(has(want,'灯盏窝','煸酥吐油','焦香','皱皮')&&!has(got,'灯盏窝','煸酥吐油','焦香','皱皮'))return'煸的火候不够：下锅后开大火、少翻动，多煸 1–2 分钟，等肉出的水收干、开始吐油再放别的料；一次下的肉太多也煸不起来';
+  if(has(want,'滑嫩','软嫩','嫩滑','脆嫩','爽脆','断生','刚好')&&has(got,'老','柴','散','软烂','黄软','干香','未煸香'))return'加热过头了：缩短这一段的时间，或先滑熟盛出、最后回锅';
+  if(has(want,'软糯','酥烂','软烂')&&has(got,'韧','嚼','脆'))return'炖的时间不够：小火多炖一会儿，或用高压锅';
+  if(has(want,'嚼劲','爽脆')&&has(got,'软糯','酥烂','软烂'))return'炖得太久了：缩短炖的时间';
+  return''}
 function compute(){
   let sim,ev;try{sim=simulate(st.steps);ev=evaluate(sim,st.fin,st.eat)}catch(err){console.error(err);return}
   const T=target();const W=warnings(sim,ev);const types=flavorTypes(ev.D,ev.flags);const meth=detectMethods(sim);
@@ -116,7 +124,7 @@ function compute(){
    ['锅里最高温',Math.round(sim.cs.pot.maxT)+'°C'],['剩余水分 / 油',`${Math.round(ev.water)} g / ${Math.round(ev.oil)} g`],
    ['平均入味',Math.round(ev.absAvg*100)+'%']].map(f=>`<div><b>${f[0]}</b>${f[1]}</div>`).join('');
   let hints=[];if(cmp){for(const [k,d] of cmp.diffs){const f=FIX[k];hints.push(`<li><b>${DN[k]}${d>0?'偏重':'不足'} ${d>0?'+':''}${d.toFixed(1)}</b>：${d>0?(f?'减少'+f[1]:'减少相关调料'):(f&&f[0]?'加'+f[0]:'检查做法')}</li>`)}
-    const tt=T.tex;for(const t of ev.tex){const o=tt.find(x=>x.id===t.id);if(o&&o.lab!==t.lab)hints.push(`<li><b>${esc(t.name)}</b>：标准是“${o.lab}”，你的是“${t.lab}”</li>`)}
+    const tt=T.tex;for(const t of ev.tex){const o=tt.find(x=>x.id===t.id);if(o&&o.lab!==t.lab)hints.push(`<li><b>${esc(t.name)}</b>：标准是“${o.lab}”，你的是“${t.lab}”${texAdvice(o.lab,t.lab)?'。'+texAdvice(o.lab,t.lab):''}</li>`)}
     if(!hints.length)hints.push('<li>和标准做法几乎一致。试着改一个变量看看会发生什么。</li>')}
   $('hints').innerHTML=hints.slice(0,6).join('');
   drawRadar(ev.D,T&&T.D);drawTemp(sim);

@@ -875,7 +875,7 @@ function colorOf(col,M){const r=col.red*500/M,b=col.brown*500/M,y=col.yellow*500
   let name,hex;if(b>32){name='酱黑';hex='#3b2214'}else if(r>8&&b>4){name='红亮酱色';hex='#8e2a17'}else if(r>8){name='红亮';hex='#c8321e'}else if(b>6){name='酱红';hex='#7a3f1d'}else if(r>3){name='微红';hex='#d9683f'}else if(y>8){name='金黄';hex='#d9a321'}else if(b>2.5){name='浅酱/金黄';hex='#b9803c'}else{name='本色清爽';hex='#e8dcc0'}return{name,hex,r,b}}
 function texture(f,d){const dn=f.done;let lab;
   if(dn<.6)lab=d.mustCook?'生':'生脆';else if(dn<.97)lab=d.mustCook?'未熟透':'七八成熟';
-  else if(d.fat>=.2&&f.sf<1.2&&!(d.coll&&f.tender<.15&&f.over<1)){lab=f.brown>.6?'起灯盏窝·干香':f.over<2?'软嫩':'干香'}
+  else if(d.fat>=.2&&f.sf<1.2&&!(d.coll&&f.tender<.15&&f.over<1)){const small=f.sf<.45||f.cut==='丝'||f.cut==='丁';lab=small?(f.brown>.6?'煸酥吐油':f.over<2?'滑嫩':'炒散未煸香'):(f.brown>.6?'起灯盏窝·干香':f.over<2?'软嫩':'干香未卷边')}
   else if(d.coll&&(f.sf>=1.2||(d.coll>=40&&f.sf>=.8))&&(f.wetT||0)<480&&f.tender<.4){lab=f.brown>.4?'焦香有嚼劲':'爽脆有嚼劲'}
   else if(d.coll&&(f.sf>=1.2||(d.coll>=40&&f.sf>=.8))){const need=f.sf<.6?.25:1;const t=f.tender/need;lab=t<.4?'硬韧嚼不动':t<1?'偏韧':t<1.8?'软糯':'酥烂脱骨'}
   else if(d.lean||d.coll){const o=d.coll?f.over/2:f.over;lab=o<1?'滑嫩':o<3?'刚好':o<6?'偏老':(d.fish?'老散':'柴老')}
@@ -1287,7 +1287,7 @@ function insertAt(S,where,step){
   if(where==='late'){let li=-1;for(let k=S.length-1;k>=0;k--)if(S[k].t==='heat'){li=k;break}i=li>=0?li:S.length}
   S.splice(i,0,step);return i}
 function texPen(ev,prefs){let p=0;for(const t of ev.tex){const d=FD[t.id];const meat=['肉','禽','水产'].includes(d.cat);
-    if(meat&&prefs.meat==='嫩'&&!['滑嫩','刚好','软糯','酥烂脱骨'].includes(t.lab))p+=3;
+    if(meat&&prefs.meat==='嫩'&&!['滑嫩','软嫩','刚好','软糯','酥烂脱骨'].includes(t.lab))p+=3;
     if(meat&&prefs.meat==='烂'&&!['软糯','酥烂脱骨','软烂','软烂入味'].includes(t.lab))p+=2;
     if(!meat&&prefs.veg==='脆'&&!['爽脆','脆嫩','断生','生脆'].includes(t.lab))p+=1.5;
     if(!meat&&prefs.veg==='软'&&!['软','软烂','软烂入味','软糯起沙','黄软','皱皮软香'].includes(t.lab))p+=1.5;
@@ -1984,6 +1984,14 @@ function simpleView(){const box=$('simpleView');if(!st.steps.length){box.innerHT
   let card;try{card=recipeCard(st.steps)}catch(e){box.textContent='';return}
   box.innerHTML=cardHTML(card)+`<div class="fl"><button class="btn sm" id="toCard">菜谱卡 / 存菜谱</button><button class="btn sm" id="toFull">改步骤、用量和火候 →</button></div>`;
   $('toFull').onclick=()=>setV('full');$('toCard').onclick=()=>$('wcard').click()}
+// 口感对不上时给个改法
+function texAdvice(want,got){const has=(s,...k)=>k.some(x=>s.includes(x));
+  if(has(got,'生','未熟透','七八成熟'))return'加热不够，延长这一段的时间或开大火';
+  if(has(want,'灯盏窝','煸酥吐油','焦香','皱皮')&&!has(got,'灯盏窝','煸酥吐油','焦香','皱皮'))return'煸的火候不够：下锅后开大火、少翻动，多煸 1–2 分钟，等肉出的水收干、开始吐油再放别的料；一次下的肉太多也煸不起来';
+  if(has(want,'滑嫩','软嫩','嫩滑','脆嫩','爽脆','断生','刚好')&&has(got,'老','柴','散','软烂','黄软','干香','未煸香'))return'加热过头了：缩短这一段的时间，或先滑熟盛出、最后回锅';
+  if(has(want,'软糯','酥烂','软烂')&&has(got,'韧','嚼','脆'))return'炖的时间不够：小火多炖一会儿，或用高压锅';
+  if(has(want,'嚼劲','爽脆')&&has(got,'软糯','酥烂','软烂'))return'炖得太久了：缩短炖的时间';
+  return''}
 function compute(){
   let sim,ev;try{sim=simulate(st.steps);ev=evaluate(sim,st.fin,st.eat)}catch(err){console.error(err);return}
   const T=target();const W=warnings(sim,ev);const types=flavorTypes(ev.D,ev.flags);const meth=detectMethods(sim);
@@ -2000,7 +2008,7 @@ function compute(){
    ['锅里最高温',Math.round(sim.cs.pot.maxT)+'°C'],['剩余水分 / 油',`${Math.round(ev.water)} g / ${Math.round(ev.oil)} g`],
    ['平均入味',Math.round(ev.absAvg*100)+'%']].map(f=>`<div><b>${f[0]}</b>${f[1]}</div>`).join('');
   let hints=[];if(cmp){for(const [k,d] of cmp.diffs){const f=FIX[k];hints.push(`<li><b>${DN[k]}${d>0?'偏重':'不足'} ${d>0?'+':''}${d.toFixed(1)}</b>：${d>0?(f?'减少'+f[1]:'减少相关调料'):(f&&f[0]?'加'+f[0]:'检查做法')}</li>`)}
-    const tt=T.tex;for(const t of ev.tex){const o=tt.find(x=>x.id===t.id);if(o&&o.lab!==t.lab)hints.push(`<li><b>${esc(t.name)}</b>：标准是“${o.lab}”，你的是“${t.lab}”</li>`)}
+    const tt=T.tex;for(const t of ev.tex){const o=tt.find(x=>x.id===t.id);if(o&&o.lab!==t.lab)hints.push(`<li><b>${esc(t.name)}</b>：标准是“${o.lab}”，你的是“${t.lab}”${texAdvice(o.lab,t.lab)?'。'+texAdvice(o.lab,t.lab):''}</li>`)}
     if(!hints.length)hints.push('<li>和标准做法几乎一致。试着改一个变量看看会发生什么。</li>')}
   $('hints').innerHTML=hints.slice(0,6).join('');
   drawRadar(ev.D,T&&T.D);drawTemp(sim);

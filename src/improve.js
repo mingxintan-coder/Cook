@@ -57,7 +57,7 @@ function insertAt(S,where,step){
   if(where==='late'){let li=-1;for(let k=S.length-1;k>=0;k--)if(S[k].t==='heat'){li=k;break}i=li>=0?li:S.length}
   S.splice(i,0,step);return i}
 function texPen(ev,prefs){let p=0;for(const t of ev.tex){const d=FD[t.id];const meat=['肉','禽','水产'].includes(d.cat);
-    if(meat&&prefs.meat==='嫩'&&!['滑嫩','刚好','软糯','酥烂脱骨'].includes(t.lab))p+=3;
+    if(meat&&prefs.meat==='嫩'&&!['滑嫩','软嫩','刚好','软糯','酥烂脱骨'].includes(t.lab))p+=3;
     if(meat&&prefs.meat==='烂'&&!['软糯','酥烂脱骨','软烂','软烂入味'].includes(t.lab))p+=2;
     if(!meat&&prefs.veg==='脆'&&!['爽脆','脆嫩','断生','生脆'].includes(t.lab))p+=1.5;
     if(!meat&&prefs.veg==='软'&&!['软','软烂','软烂入味','软糯起沙','黄软','皱皮软香'].includes(t.lab))p+=1.5;

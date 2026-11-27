@@ -482,7 +482,7 @@ function colorOf(col,M){const r=col.red*500/M,b=col.brown*500/M,y=col.yellow*500
   let name,hex;if(b>32){name='酱黑';hex='#3b2214'}else if(r>8&&b>4){name='红亮酱色';hex='#8e2a17'}else if(r>8){name='红亮';hex='#c8321e'}else if(b>6){name='酱红';hex='#7a3f1d'}else if(r>3){name='微红';hex='#d9683f'}else if(y>8){name='金黄';hex='#d9a321'}else if(b>2.5){name='浅酱/金黄';hex='#b9803c'}else{name='本色清爽';hex='#e8dcc0'}return{name,hex,r,b}}
 function texture(f,d){const dn=f.done;let lab;
   if(dn<.6)lab=d.mustCook?'生':'生脆';else if(dn<.97)lab=d.mustCook?'未熟透':'七八成熟';
-  else if(d.fat>=.2&&f.sf<1.2&&!(d.coll&&f.tender<.15&&f.over<1)){lab=f.brown>.6?'起灯盏窝·干香':f.over<2?'软嫩':'干香'}
+  else if(d.fat>=.2&&f.sf<1.2&&!(d.coll&&f.tender<.15&&f.over<1)){const small=f.sf<.45||f.cut==='丝'||f.cut==='丁';lab=small?(f.brown>.6?'煸酥吐油':f.over<2?'滑嫩':'炒散未煸香'):(f.brown>.6?'起灯盏窝·干香':f.over<2?'软嫩':'干香未卷边')}
   else if(d.coll&&(f.sf>=1.2||(d.coll>=40&&f.sf>=.8))&&(f.wetT||0)<480&&f.tender<.4){lab=f.brown>.4?'焦香有嚼劲':'爽脆有嚼劲'}
   else if(d.coll&&(f.sf>=1.2||(d.coll>=40&&f.sf>=.8))){const need=f.sf<.6?.25:1;const t=f.tender/need;lab=t<.4?'硬韧嚼不动':t<1?'偏韧':t<1.8?'软糯':'酥烂脱骨'}
   else if(d.lean||d.coll){const o=d.coll?f.over/2:f.over;lab=o<1?'滑嫩':o<3?'刚好':o<6?'偏老':(d.fish?'老散':'柴老')}
